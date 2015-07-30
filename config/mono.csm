@@ -1,0 +1,46 @@
+################################################################################
+# Configuration file for CSM + applications                                    #
+################################################################################
+
+
+################################################################################
+# Specify here which walls you want to run and in which graphics pipe          #
+################################################################################
+Walls front
+
+
+################################################################################
+# Display information for walls (pipe # & (optional) window geometry)          #
+# window geometry: XDIMxYDIM+XOFFSET+YOFFSET                                   #
+################################################################################
+WallDisplay front :0 window  800x600+0+0
+
+
+################################################################################
+# Display mode - mono or stereo                                                #
+################################################################################
+DisplayMode	mono
+
+
+################################################################################
+# Origin of coordinates of the CAVE (given in distance to the walls)           #
+# distance to left wall      distance to floor      distance to front wall     #
+################################################################################
+Origin          1000                 1000                   1000  centimeters
+
+# Cave width (& depth)
+CAVEWidth       2000.0  centimeters
+
+# Cave height
+CAVEHeight      2000.0 centimeters
+
+
+################################################################################
+# Cave units for GL coordinates (Meters or feet)                               #
+# - units tracking data will be given in                                       #
+################################################################################
+Units   centimeters
+
+FollowHead on
+SensorIDHead 0
+SensorIDController 1

@@ -1,0 +1,113 @@
+################################################################################
+# Configuration file for CSM + applications                                    #
+################################################################################
+
+
+################################################################################
+# Specify here which walls you want to run and in which graphics pipe          #
+################################################################################
+Walls caverender01 caverender02 caverender03 caverender04 caverender05 caverender06 caverender07 caverender08 caverender09 caverender10
+
+################################################################################
+# Display information for walls (pipe # & (optional) window geometry)          #
+# window geometry: XDIMxYDIM+XOFFSET+YOFFSET                                   #
+################################################################################
+WallDisplay caverender01  :0  1920x1200+0+0
+WallDisplay caverender02  :1  1920x1200+0+0
+WallDisplay caverender03  :2  1920x1200+0+0
+WallDisplay caverender04  :3  1920x1200+0+0
+WallDisplay caverender05  :4  1920x1200+0+0
+WallDisplay caverender06  :5  1920x1200+0+0
+WallDisplay caverender07  :6  1920x1200+0+0
+WallDisplay caverender08  :7  1920x1200+0+0
+WallDisplay caverender09  :8  1920x1200+0+0
+WallDisplay caverender10  :9  1920x1200+0+0
+
+################################################################################
+#     135 cm
+#  Q2__________________________
+#  |                           |
+#  |                           |
+#  |                           |
+#  |  33.75 cm                 |
+# P2+---------------------------+ #    ^
+# ||                           || #    |      
+# ||             X             || #  480px = 67.5 cm
+# || -33.75 cm                 || #    |
+# |Q1_________________________Q3| #    v
+# |                             | #
+# |                             | #
+# | -135 cm                     | #
+# P1 +--------------------------+ P3 #
+# #
+################################################################################
+# physical wall: 270cm*270cm
+# 2 Projectors each, 480px overlap, total pixel height: 2*1200-480 = 1920px
+# origin of TrackD is at room center
+
+#ProjectionData   wallname  * wall     x    y        z        x    y        z        x    y       z    unit
+# left wall
+ProjectionData caverender01 * wall  -135  101.25   135     -135  270      135     -135  101.25 -135    centimeters
+ProjectionData caverender02 * wall 	-135    0      135     -135  168.75   135     -135    0    -135    centimeters
+# front wall
+ProjectionData caverender03 * wall  -135  101.25  -135     -135  270     -135      135  101.25 -135    centimeters
+ProjectionData caverender04 * wall  -135    0     -135     -135  168.75  -135      135    0    -135    centimeters
+# right wall
+ProjectionData caverender05 * wall   135  101.25  -135      135  270     -135      135  101.25  135    centimeters
+ProjectionData caverender06 * wall   135    0     -135      135  168.75  -135      135    0     135    centimeters
+# floor
+ProjectionData caverender07 * wall  -135    0      33.75   -135    0     -135      135    0      33.75 centimeters
+ProjectionData caverender08 * wall  -135    0     135      -135    0      -33.75   135    0     135    centimeters
+# ceiling
+ProjectionData caverender09 * wall  -135   270   -135      -135  270       33.75   135  270    -135    centimeters
+ProjectionData caverender10 * wall  -135   270    -33.75   -135  270      135      135  270     -33.75 centimeters
+
+################################################################################
+# Display mode - mono or stereo                                                #
+################################################################################
+DisplayMode	stereo
+
+
+################################################################################
+# eye separation (cm)                                                          #
+################################################################################
+EyeSeparation 6.0
+
+
+################################################################################
+#InterocularDistance <distance> <units>                                        #
+################################################################################
+#InterocularDistance 6.0 cm
+
+
+################################################################################
+# Origin of coordinates of the CAVE (given in distance to the walls)           #
+# distance to left wall      distance to floor      distance to front wall     #
+################################################################################
+#Origin          1000                 1000                   1000  centimeters
+
+# Cave width (& depth)
+#CAVEWidth       2000.0  centimeters
+
+# Cave height
+#CAVEHeight      2000.0 centimeters
+
+
+################################################################################
+# Cave units for GL coordinates (Meters or feet)                               #
+# - units tracking data will be given in                                       #
+################################################################################
+Units   meters
+
+################################################################################
+# Whether client code * server displays use multicast to communicate           #
+# warning - enabling this slows things down (on single system at least...)     #
+################################################################################
+MulticastServerComms   no
+
+Broadcastaddress 129.187.11.191
+TrackerDaemonKey 4126
+ControllerDaemonKey 4127
+FollowHead on
+SensorIDHead 1
+SensorIDController 0

@@ -1,0 +1,90 @@
+################################################################################
+# Configuration file for CSM + applications                                    #
+################################################################################
+
+
+################################################################################
+# Specify here which walls you want to run and in which graphics pipe          #
+################################################################################
+Walls powerwall
+
+################################################################################
+# Display information for walls (pipe # & (optional) window geometry)          #
+# window geometry: XDIMxYDIM+XOFFSET+YOFFSET                                   #
+################################################################################
+WallDisplay powerwall  :0  800x600+0+0
+
+################################################################################
+#     135 cm
+#  Q2__________________________
+#  |                           |
+#  |                           |
+#  |                           |
+#  |  33.75 cm                 |
+# P2+---------------------------+ #    ^
+# ||                           || #    |      
+# ||             X             || #  480px = 67.5 cm
+# || -33.75 cm                 || #    |
+# |Q1_________________________Q3| #    v
+# |                             | #
+# |                             | #
+# | -135 cm                     | #
+# P1 +--------------------------+ P3 #
+# #
+################################################################################
+# physical wall: 270cm*270cm
+# 2 Projectors each, 480px overlap, total pixel height: 2*1200-480 = 1920px
+# origin of TrackD is at room center
+
+#ProjectionData   wallname  * wall     x    y        z        x    y        z        x    y       z    unit
+ProjectionData powerwall * wall  -135  101.25  -135     -135  270     -135      135  101.25 -135    centimeters
+
+################################################################################
+# Display mode - mono or stereo                                                #
+################################################################################
+DisplayMode	stereo
+
+
+################################################################################
+# eye separation (cm)                                                          #
+################################################################################
+EyeSeparation 6.0
+
+
+################################################################################
+#InterocularDistance <distance> <units>                                        #
+################################################################################
+#InterocularDistance 6.0 cm
+
+
+################################################################################
+# Origin of coordinates of the CAVE (given in distance to the walls)           #
+# distance to left wall      distance to floor      distance to front wall     #
+################################################################################
+#Origin          1000                 1000                   1000  centimeters
+
+# Cave width (& depth)
+#CAVEWidth       2000.0  centimeters
+
+# Cave height
+#CAVEHeight      2000.0 centimeters
+
+
+################################################################################
+# Cave units for GL coordinates (Meters or feet)                               #
+# - units tracking data will be given in                                       #
+################################################################################
+Units   meters
+
+################################################################################
+# Whether client code * server displays use multicast to communicate           #
+# warning - enabling this slows things down (on single system at least...)     #
+################################################################################
+MulticastServerComms   no
+
+Broadcastaddress 129.187.11.191
+TrackerDaemonKey 4126
+ControllerDaemonKey 4127
+FollowHead on
+SensorIDHead 1
+SensorIDController 0
