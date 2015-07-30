@@ -19,6 +19,8 @@
 #include <vrpn_Button.h>
 #include <vrpn_Analog.h>
 
+
+
 OSG_USING_NAMESPACE
 
 
@@ -29,6 +31,38 @@ OSGCSM::CAVESceneManager *mgr = nullptr;
 vrpn_Tracker_Remote* tracker =  nullptr;
 vrpn_Button_Remote* button = nullptr;
 vrpn_Analog_Remote* analog = nullptr;
+
+NodeRecPtr root;
+
+class Projectile {
+public: 
+	NodeRecPtr node;
+	NodeRecPtr	tr;
+	Vec3f dir;
+	void init(Vec3f pos, Vec3f dir_){
+
+		node = makeSphere(2, 3);
+		
+		root->addChild(node);
+		
+		root->subChild(node);
+		
+		ComponentTransformRecPtr ct = ComponentTransform::create();
+		ct->setTranslation(pos);
+		ct->setRotation(Quaternion(Vec3f(1,0,0),osgDegree2Rad(0)));
+
+		tr = Node::create();
+		tr->setCore(ct);
+		tr->addChild(node);
+		root->addChild(tr);
+
+		dir = dir_;
+	}
+
+	void update(int ticks){
+		Vec3f ad = dir * ((float) ticks) *0.01f;
+	}
+};
 
 void cleanup()
 {
@@ -42,8 +76,24 @@ void print_tracker();
 
 NodeTransitPtr buildScene()
 {
-	// you will see a donut at the floor, slightly skewed, depending on head_position
-	return makeTorus(10.f, 50.f, 32.f, 64.f);
+	root = Node::create();
+	root->setCore(Group::create());
+	
+	NodeRecPtr boxChild = makeBox(5,4,4,1,1,1);
+	NodeRecPtr beach = makePlane(30, 30, 1, 1);
+
+	GeometryRecPtr sunGeo = makeSphereGeo(2, 3);
+	NodeRecPtr sunChild = Node::create();
+	sunChild->setCore(sunGeo);
+
+	//root->addChild(sunChild);
+	root->addChild(boxChild);
+	root->addChild(beach);
+
+	Projectile pr;
+	pr.init(Vec3f(1,1,0),Vec3f(0,0,0));
+
+	return NodeTransitPtr(root);
 }
 
 template<typename T>
@@ -81,14 +131,21 @@ void VRPN_CALLBACK callback_hand_tracker(void* userData, const vrpn_TRACKERCB tr
 auto analog_values = Vec3f();
 void VRPN_CALLBACK callback_analog(void* userData, const vrpn_ANALOGCB analog)
 {
-	if (analog.num_channel >= 2)
+	if (analog.num_channel >= 2){
 		analog_values = Vec3f(analog.channel[0], 0, -analog.channel[1]);
+	}
 }
 
 void VRPN_CALLBACK callback_button(void* userData, const vrpn_BUTTONCB button)
 {
-	if (button.button == 0 && button.state == 1)
-		print_tracker();
+	if (button.button == 0 && button.state == 1){
+		//TODO: check pos and start pulling if true
+
+	}
+	if (button.button == 0 && button.state == 0){
+		//TODO: check if pulling and release if true
+
+	}
 }
 
 void InitTracker(OSGCSM::CAVEConfig &cfg)
