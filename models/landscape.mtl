@@ -1,0 +1,21 @@
+# Blender MTL File: 'landscape_02.blend'
+# Material Count: 2
+
+newmtl Material.003
+Ns 9.803922
+Ka 0.000000 0.000000 0.000000
+Kd 0.394455 0.394455 0.394455
+Ks 0.306931 0.306931 0.306931
+Ni 1.000000
+d 1.000000
+illum 2
+map_Kd ground_1024_raw.jpg
+
+newmtl Material.003_NONE
+Ns 9.803922
+Ka 0.000000 0.000000 0.000000
+Kd 0.394455 0.394455 0.394455
+Ks 0.306931 0.306931 0.306931
+Ni 1.000000
+d 1.000000
+illum 2

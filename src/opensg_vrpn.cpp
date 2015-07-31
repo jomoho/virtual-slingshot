@@ -32,7 +32,11 @@ vrpn_Tracker_Remote* tracker =  nullptr;
 vrpn_Button_Remote* button = nullptr;
 vrpn_Analog_Remote* analog = nullptr;
 
-NodeRecPtr root;
+NodeRecPtr root, 
+		landTrans,
+		standTrans,
+		targetTrans,
+		shotTrans;
 
 class Projectile {
 public: 
@@ -74,25 +78,91 @@ void cleanup()
 
 void print_tracker();
 
+NodeRecPtr loadModel(string filename, 
+	Vec3f trans = Vec3f(0,0,0), 
+	Vec3f scale = Vec3f(1.0f,1.0f,1.0f), 
+	Quaternion rot = Quaternion(Vec3f(1,0,0),osgDegree2Rad(0))){
+	
+ 	NodeRecPtr model = SceneFileHandler::the()->read(filename.c_str());
+
+	ComponentTransformRecPtr modelCT = ComponentTransform::create();
+	modelCT->setTranslation(trans);
+	modelCT->setRotation(rot);
+	modelCT->setScale(scale);
+	NodeRecPtr modelTrans = makeNodeFor(modelCT);
+	
+	return modelTrans;
+ }
+
 NodeTransitPtr buildScene()
 {
 	root = Node::create();
 	root->setCore(Group::create());
-	
-	NodeRecPtr boxChild = makeBox(5,4,4,1,1,1);
-	NodeRecPtr beach = makePlane(30, 30, 1, 1);
 
 	GeometryRecPtr sunGeo = makeSphereGeo(2, 3);
 	NodeRecPtr sunChild = Node::create();
 	sunChild->setCore(sunGeo);
+	root->addChild(sunChild);
 
-	//root->addChild(sunChild);
-	root->addChild(boxChild);
-	root->addChild(beach);
 
-	Projectile pr;
-	pr.init(Vec3f(1,1,0),Vec3f(0,0,0));
+	//decouple the nodes to be shifted in hierarchy from the scene
+	root->subChild(sunChild);
 
+	TransformRecPtr sunTransCore = Transform::create();
+	Matrix sunMatrix;
+
+	// Setting up the matrix
+	sunMatrix.setIdentity();
+	sunMatrix.setTranslate(0,20,0);
+	sunTransCore->setMatrix(sunMatrix); // Adding the Matrix to the core
+
+	// Setting up the node
+	NodeRecPtr sunTrans = makeNodeFor(sunTransCore);
+	sunTrans->addChild(sunChild);
+
+
+	// put the nodes in the scene again
+	root->addChild(sunTrans);
+	root->subChild(sunTrans);
+	
+	landTrans = loadModel("models/landscape.obj");
+	standTrans = loadModel("models/stand.obj");
+	targetTrans = loadModel("models/target.obj");
+	shotTrans = loadModel("models/slingshot.obj");
+	
+	
+	root->addChild(landTrans);
+	root->addChild(standTrans);
+	root->addChild(targetTrans);
+	root->addChild(shotTrans);
+	
+		
+	PointLightRecPtr sunLight = PointLight::create();
+	//sunLight->setAttenuation(1,0,2);
+
+	//color information
+	sunLight->setDiffuse(Color4f(1,1,1,1));
+	sunLight->setAmbient(Color4f(0.2f,0.2f,0.2f,1));
+	sunLight->setSpecular(Color4f(1,1,1,1));
+
+	sunLight->setBeacon(sunChild); //attach to the sun node use this node as position beacon
+
+	root->setCore(sunLight);
+
+	DirectionalLightRecPtr dirLight = DirectionalLight::create();
+	dirLight->setDirection(1,1,-1);
+
+	//color information
+	dirLight->setDiffuse(Color4f(1,1,1,1));
+	dirLight->setAmbient(Color4f(0.2f,0.2f,0.2f,1));
+	dirLight->setSpecular(Color4f(1,1,1,1));
+
+
+	//wrap the root, cause only nodes below the lights will be lit
+	NodeRecPtr ueberroot = makeNodeFor(dirLight);
+	ueberroot->addChild(root);
+
+	root = ueberroot;
 	return NodeTransitPtr(root);
 }
 
