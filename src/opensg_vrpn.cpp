@@ -80,35 +80,34 @@ void cleanup()
 
 void print_tracker();
 
-void initSkybox(){
+void initSkybox() {
 std::string skyPath ="models/ThickCloudsWater/ThickCloudsWater";
 
 skybox.init(5,5,5, 1000, (skyPath+"Down2048.png").c_str(),
-			(skyPath+"Up2048.png").c_str(),
-			(skyPath+"Front2048.png").c_str(),
-			(skyPath+"Back2048.png").c_str(),
-			(skyPath+"Right2048.png").c_str(),
-			(skyPath+"Left2048.png").c_str());
+		(skyPath+"Up2048.png").c_str(),
+		(skyPath+"Front2048.png").c_str(),
+		(skyPath+"Back2048.png").c_str(),
+		(skyPath+"Right2048.png").c_str(),
+		(skyPath+"Left2048.png").c_str());
 }
 
 NodeRecPtr loadModel(string filename, 
 	Vec3f trans = Vec3f(0,0,0), 
-	Vec3f scale = Vec3f(1.0f,1.0f,1.0f), 
-	Quaternion rot = Quaternion(Vec3f(1,0,0),osgDegree2Rad(0))){
+	float scale = 100.0f, 
+	Quaternion rot = Quaternion(Vec3f(1,0,0),osgDegree2Rad(0))) {
 	
  	NodeRecPtr model = SceneFileHandler::the()->read(filename.c_str());
 
 	ComponentTransformRecPtr modelCT = ComponentTransform::create();
 	modelCT->setTranslation(trans);
 	modelCT->setRotation(rot);
-	modelCT->setScale(scale);
+	modelCT->setScale( Vec3f(scale, scale, scale));
 	NodeRecPtr modelTrans = makeNodeFor(modelCT);
 	
 	return modelTrans;
  }
 
-NodeTransitPtr buildScene()
-{
+NodeTransitPtr buildScene() {
 	root = Node::create();
 	root->setCore(Group::create());
 
@@ -142,15 +141,15 @@ NodeTransitPtr buildScene()
 	standTrans = loadModel("models/stand.obj");
 	targetTrans = loadModel("models/target.obj", Vec3f(0,1.5f,0));
 	shotTrans = loadModel("models/slingshot.obj");
+	projectileTrans = loadModel("models/projectile.obj", Vec3f(0.0f), 1.0f);
 	
 	
 	root->addChild(landTrans);
 	root->addChild(standTrans);
 	root->addChild(targetTrans);
 	root->addChild(shotTrans);
+	root->addChild(projectileTrans);
 
-	initSkybox()
-	root->addChild(skybox.getNodePtr());
 			
 	PointLightRecPtr sunLight = PointLight::create();
 	//sunLight->setAttenuation(1,0,2);
@@ -178,8 +177,119 @@ NodeTransitPtr buildScene()
 	ueberroot->addChild(root);
 
 	root = ueberroot;
+
+	//Skybox
+	initSkybox()
+	root->addChild(skybox.getNodePtr());
 	return NodeTransitPtr(root);
 }
+
+#define PULL_LOOSE 0
+#define PULL_GOING 1
+int pullState = PULL_LOOSE;
+
+#define PROJ_DEAD 0
+#define PROJ_FLY 1
+#define PROJ_PULL 2
+int projState = PROJ_DEAD;
+Vec3f projSpeed, projPos;
+
+void eventStartPull(){
+	if(pullState == PULL_GOING){
+		return;
+	}
+	
+	Vec3f d1 = schleuder_position - hand_position;
+	Vec3f d2 = schleuder_position - head_position;
+	std::cout << "dot: " << d1.dot(d2) << std::endl;
+	
+	if(d1.length() <= 30.0f){
+		pullState = PULL_GOING;
+		projState PROJ_PULL;
+	}
+}
+
+void eventStopPull(){
+	if(pullState == PULL_LOOSE){
+		return;
+	}
+	
+	Vec3f d1 = schleuder_position - hand_position;	
+	startProjectile(hand_position, d1);
+	pullState = PULL_LOOSE;
+}
+
+void updateSlinshot(float dt){
+	if(pullState == PULL_GOING){
+		//update slingshot
+	}else if(pullState == PULL_LOOSE){
+		
+	}
+}
+
+void startProjectile(Vec3f pos, Vec3f dir){
+	projPos = pos;
+	projSpeed = dir;
+	projState = PROJ_FLY;
+}
+
+void stopProjectile(Vec3f pos){
+	projPos = pos;
+	projSpeed = Vec3f(0,0,0);
+	projState = PROJ_DEAD;
+}
+
+void updateProjectile(float dt){
+	if(projState == PROJ_DEAD){
+		return;
+	}	
+	
+	if(projState == PROJ_PULL){
+		projPos = hand_position;
+	}
+	
+	if(projState == PROJ_FLY){	
+		float fact = 1.0f;
+		Vec3f gravity = Vec3f(0.0f, 98.1f, 0.0f);
+	
+		//new position
+		Vec3f nPos = projPos + (projSpeed * dt * fact) + (gravity * dt) ;
+		pt->setTranslation(nPos);
+	
+		//check if target is hit:
+		//the flight direction	
+		if (targetPos.z < projPos.z && targetPos.z > nPos.z){
+			Vec3f d = nPos - projPos;
+			float t = (targetPos.z - projPos.z) / d.z;		
+			//calc the intersection point:
+			Vec3f inter = projPos + (d*t);
+		
+			Vec3f d2	= targetPos - inter;
+			float targetSize = 100.0f;
+			if(d2.length() <= targetSize){
+				float score = targetSize - d2.length();
+				std::cout << "hit target: " << score << std::endl;
+				stopProjectile(inter);
+			}	
+		}
+	
+		//check if floor is hit 
+		if (nPos.y <= 0.0f){
+			Vec3f d = nPos - projPos;
+			float t = (0.0f - projPos.y) / d.y;		
+			//calc the intersection point:
+			Vec3f inter = projPos + (d*t);
+			std::cout << "hit floor: " << score << std::endl;
+			stopProjectile(inter);
+		}
+	}
+	
+	//update position finally	
+	ComponentTransformRecPtr pt = dynamic_cast<ComponentTransform*>(projectileTrans->getCore());
+	pt->setTranslation(projPos);
+}
+
+
 
 template<typename T>
 T scale_tracker2cm(const T& value)
@@ -225,11 +335,11 @@ void VRPN_CALLBACK callback_button(void* userData, const vrpn_BUTTONCB button)
 {
 	if (button.button == 0 && button.state == 1){
 		//TODO: check pos and start pulling if true
-
+		eventStartPull();
 	}
 	if (button.button == 0 && button.state == 0){
 		//TODO: check if pulling and release if true
-
+		eventReleasePull();
 	}
 }
 
@@ -241,8 +351,8 @@ void InitTracker(OSGCSM::CAVEConfig &cfg)
 		tracker = new vrpn_Tracker_Remote(vrpn_name);
 		tracker->shutup = true;
 		tracker->register_change_handler(NULL, callback_head_tracker, cfg.getSensorIDHead());
-		tracker->register_change_handler(NULL, callback_schleuder_tracker, cfg.getSensorIDController());
-		tracker->register_change_handler(NULL, callback_hand_tracker, 3);
+		tracker->register_change_handler(NULL, callback_hand_tracker, cfg.getSensorIDController());
+		tracker->register_change_handler(NULL, callback_schleuder_tracker, 3);
 		button = new vrpn_Button_Remote(vrpn_name);
 		button->shutup = true;
 		button->register_change_handler(nullptr, callback_button);
@@ -304,6 +414,18 @@ void keyboard(unsigned char k, int x, int y)
 	}
 }
 
+//****** Update LOOP *******//
+void updateLoop(float dt){
+	ComponentTransformRecPtr st = dynamic_cast<ComponentTransform*>(shotTrans->getCore());
+	bt->setTranslation(schleuder_position);
+	st->setRotation(schleuder_orientation);
+	
+	float dt = 1.0f/30.0f;
+	
+	updateSlinshot(dt);	
+	updateProjectile(dt);	
+}
+
 void setupGLUT(int *argc, char *argv[])
 {
 	glutInit(argc, argv);
@@ -334,6 +456,11 @@ void setupGLUT(int *argc, char *argv[])
 		const auto speed = 1.f;
 		mgr->setUserTransform(head_position, head_orientation);
 		mgr->setTranslation(mgr->getTranslation() + speed * analog_values);
+		
+		//update
+		update(deltaTime);
+		
+		
 		commitChanges();
 		mgr->redraw();
 		// the changelist should be cleared - else things could be copied multiple times
