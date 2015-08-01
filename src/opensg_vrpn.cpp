@@ -38,6 +38,8 @@ NodeRecPtr root,
 		targetTrans,
 		shotTrans;
 
+Skybox skybox;
+
 class Projectile {
 public: 
 	NodeRecPtr node;
@@ -77,6 +79,17 @@ void cleanup()
 }
 
 void print_tracker();
+
+void initSkybox(){
+std::string skyPath ="models/ThickCloudsWater/ThickCloudsWater";
+
+skybox.init(5,5,5, 1000, (skyPath+"Down2048.png").c_str(),
+			(skyPath+"Up2048.png").c_str(),
+			(skyPath+"Front2048.png").c_str(),
+			(skyPath+"Back2048.png").c_str(),
+			(skyPath+"Right2048.png").c_str(),
+			(skyPath+"Left2048.png").c_str());
+}
 
 NodeRecPtr loadModel(string filename, 
 	Vec3f trans = Vec3f(0,0,0), 
@@ -127,7 +140,7 @@ NodeTransitPtr buildScene()
 	
 	landTrans = loadModel("models/landscape.obj");
 	standTrans = loadModel("models/stand.obj");
-	targetTrans = loadModel("models/target.obj");
+	targetTrans = loadModel("models/target.obj", Vec3f(0,1.5f,0));
 	shotTrans = loadModel("models/slingshot.obj");
 	
 	
@@ -135,8 +148,10 @@ NodeTransitPtr buildScene()
 	root->addChild(standTrans);
 	root->addChild(targetTrans);
 	root->addChild(shotTrans);
-	
-		
+
+	initSkybox()
+	root->addChild(skybox.getNodePtr());
+			
 	PointLightRecPtr sunLight = PointLight::create();
 	//sunLight->setAttenuation(1,0,2);
 
