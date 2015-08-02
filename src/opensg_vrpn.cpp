@@ -3,6 +3,7 @@
 #include <cmath>
 #include <iostream>
 #include <ios>
+#include <ctime>
 
 #include <OpenSG/OSGGLUT.h>
 #include <OpenSG/OSGConfig.h>
@@ -10,6 +11,19 @@
 #include <OpenSG/OSGGLUTWindow.h>
 #include <OpenSG/OSGMultiDisplayWindow.h>
 #include <OpenSG/OSGSceneFileHandler.h>
+#include <OpenSG/OSGSimpleSceneManager.h>
+#include <OpenSG/OSGSimpleGeometry.h>
+#include <OpenSG/OSGComponentTransform.h>
+#include <OpenSG/OSGMaterialGroup.h>
+#include <OpenSG/OSGImage.h>
+#include <OpenSG/OSGSimpleTexturedMaterial.h>
+#include <OpenSG/OSGSceneFileHandler.h>
+#include <OpenSG/OSGTextureBackground.h>
+#include <OpenSG/OSGGradientBackground.h>
+#include <OpenSG/OSGPointLight.h>
+#include <OpenSG/OSGSpotLight.h>
+
+//#include <inVRs/tools/libraries/Skybox/Skybox.h>
 
 #include <OSGCSM/OSGCAVESceneManager.h>
 #include <OSGCSM/OSGCAVEConfig.h>
@@ -36,9 +50,20 @@ NodeRecPtr root,
 		landTrans,
 		standTrans,
 		targetTrans,
-		shotTrans;
+		shotTrans,
+		projectileTrans;
 
-Skybox skybox;
+
+auto head_orientation = Quaternion(Vec3f(0.f, 1.f, 0.f), 3.141f);
+auto head_position = Vec3f(0.f, 170.f, 200.f);	// a 1.7m Person 2m in front of the scene
+
+auto schleuder_orientation = Quaternion();
+auto schleuder_position = Vec3f();
+
+auto hand_orientation = Quaternion();
+auto hand_position = Vec3f();
+
+//Skybox skybox;
 
 class Projectile {
 public: 
@@ -82,16 +107,17 @@ void print_tracker();
 
 void initSkybox() {
 std::string skyPath ="models/ThickCloudsWater/ThickCloudsWater";
-
+/*
 skybox.init(5,5,5, 1000, (skyPath+"Down2048.png").c_str(),
 		(skyPath+"Up2048.png").c_str(),
 		(skyPath+"Front2048.png").c_str(),
 		(skyPath+"Back2048.png").c_str(),
 		(skyPath+"Right2048.png").c_str(),
 		(skyPath+"Left2048.png").c_str());
+		*/
 }
 
-NodeRecPtr loadModel(string filename, 
+NodeRecPtr loadModel(std::string filename, 
 	Vec3f trans = Vec3f(0,0,0), 
 	float scale = 100.0f, 
 	Quaternion rot = Quaternion(Vec3f(1,0,0),osgDegree2Rad(0))) {
@@ -179,8 +205,8 @@ NodeTransitPtr buildScene() {
 	root = ueberroot;
 
 	//Skybox
-	initSkybox()
-	root->addChild(skybox.getNodePtr());
+	//initSkybox();
+	//root->addChild(skybox.getNodePtr());
 	return NodeTransitPtr(root);
 }
 
@@ -192,7 +218,21 @@ int pullState = PULL_LOOSE;
 #define PROJ_FLY 1
 #define PROJ_PULL 2
 int projState = PROJ_DEAD;
-Vec3f projSpeed, projPos;
+
+Vec3f projSpeed, projPos, targetPos;
+
+void startProjectile(Vec3f pos, Vec3f dir){
+	projPos = pos;
+	projSpeed = dir;
+	projState = PROJ_FLY;
+}
+
+void stopProjectile(Vec3f pos){
+	projPos = pos;
+	projSpeed = Vec3f(0,0,0);
+	projState = PROJ_DEAD;
+}
+
 
 void eventStartPull(){
 	if(pullState == PULL_GOING){
@@ -205,7 +245,7 @@ void eventStartPull(){
 	
 	if(d1.length() <= 30.0f){
 		pullState = PULL_GOING;
-		projState PROJ_PULL;
+		projState = PROJ_PULL;
 	}
 }
 
@@ -227,18 +267,6 @@ void updateSlinshot(float dt){
 	}
 }
 
-void startProjectile(Vec3f pos, Vec3f dir){
-	projPos = pos;
-	projSpeed = dir;
-	projState = PROJ_FLY;
-}
-
-void stopProjectile(Vec3f pos){
-	projPos = pos;
-	projSpeed = Vec3f(0,0,0);
-	projState = PROJ_DEAD;
-}
-
 void updateProjectile(float dt){
 	if(projState == PROJ_DEAD){
 		return;
@@ -254,13 +282,12 @@ void updateProjectile(float dt){
 	
 		//new position
 		Vec3f nPos = projPos + (projSpeed * dt * fact) + (gravity * dt) ;
-		pt->setTranslation(nPos);
 	
 		//check if target is hit:
 		//the flight direction	
-		if (targetPos.z < projPos.z && targetPos.z > nPos.z){
+		if (targetPos[3] < projPos[3] && targetPos[3] > nPos[3]){
 			Vec3f d = nPos - projPos;
-			float t = (targetPos.z - projPos.z) / d.z;		
+			float t = (targetPos[3] - projPos[3]) / d[3];		
 			//calc the intersection point:
 			Vec3f inter = projPos + (d*t);
 		
@@ -274,12 +301,12 @@ void updateProjectile(float dt){
 		}
 	
 		//check if floor is hit 
-		if (nPos.y <= 0.0f){
+		if (nPos[2] <= 0.0f){
 			Vec3f d = nPos - projPos;
-			float t = (0.0f - projPos.y) / d.y;		
+			float t = (0.0f - (float) projPos[2]) / d[2];		
 			//calc the intersection point:
 			Vec3f inter = projPos + (d*t);
-			std::cout << "hit floor: " << score << std::endl;
+			std::cout << "hit floor: " << std::endl;
 			stopProjectile(inter);
 		}
 	}
@@ -298,8 +325,6 @@ T scale_tracker2cm(const T& value)
 	return value * scale;
 }
 
-auto head_orientation = Quaternion(Vec3f(0.f, 1.f, 0.f), 3.141f);
-auto head_position = Vec3f(0.f, 170.f, 200.f);	// a 1.7m Person 2m in front of the scene
 
 void VRPN_CALLBACK callback_head_tracker(void* userData, const vrpn_TRACKERCB tracker)
 {
@@ -307,16 +332,13 @@ void VRPN_CALLBACK callback_head_tracker(void* userData, const vrpn_TRACKERCB tr
 	head_position = Vec3f(scale_tracker2cm(Vec3d(tracker.pos)));
 }
 
-auto schleuder_orientation = Quaternion();
-auto schleuder_position = Vec3f();
+
 void VRPN_CALLBACK callback_schleuder_tracker(void* userData, const vrpn_TRACKERCB tracker)
 {
 	schleuder_orientation = Quaternion(tracker.quat[0], tracker.quat[1], tracker.quat[2], tracker.quat[3]);
 	schleuder_position = Vec3f(scale_tracker2cm(Vec3d(tracker.pos)));
 }
 
-auto hand_orientation = Quaternion();
-auto hand_position = Vec3f();
 void VRPN_CALLBACK callback_hand_tracker(void* userData, const vrpn_TRACKERCB tracker)
 {
 	hand_orientation = Quaternion(tracker.quat[0], tracker.quat[1], tracker.quat[2], tracker.quat[3]);
@@ -339,7 +361,7 @@ void VRPN_CALLBACK callback_button(void* userData, const vrpn_BUTTONCB button)
 	}
 	if (button.button == 0 && button.state == 0){
 		//TODO: check if pulling and release if true
-		eventReleasePull();
+		eventStopPull();
 	}
 }
 
@@ -417,10 +439,9 @@ void keyboard(unsigned char k, int x, int y)
 //****** Update LOOP *******//
 void updateLoop(float dt){
 	ComponentTransformRecPtr st = dynamic_cast<ComponentTransform*>(shotTrans->getCore());
-	bt->setTranslation(schleuder_position);
+	st->setTranslation(schleuder_position);
 	st->setRotation(schleuder_orientation);
-	
-	float dt = 1.0f/30.0f;
+
 	
 	updateSlinshot(dt);	
 	updateProjectile(dt);	
@@ -456,9 +477,10 @@ void setupGLUT(int *argc, char *argv[])
 		const auto speed = 1.f;
 		mgr->setUserTransform(head_position, head_orientation);
 		mgr->setTranslation(mgr->getTranslation() + speed * analog_values);
-		
+			
+		float dt = 1.0f/30.0f;
 		//update
-		update(deltaTime);
+		updateLoop(dt);
 		
 		
 		commitChanges();
