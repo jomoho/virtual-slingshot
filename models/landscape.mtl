@@ -1,21 +1,29 @@
-# Blender MTL File: 'landscape_02.blend'
-# Material Count: 2
+# Blender MTL File: 'landscape_04.blend'
+# Material Count: 3
 
-newmtl Material.003
-Ns 9.803922
+newmtl Material
+Ns 96.078431
 Ka 0.000000 0.000000 0.000000
-Kd 0.394455 0.394455 0.394455
-Ks 0.306931 0.306931 0.306931
-Ni 1.000000
+Kd 0.640000 0.640000 0.640000
+Ks 0.500000 0.500000 0.500000
 d 1.000000
 illum 2
-map_Kd ground_1024_raw.jpg
+map_Kd rocks_1024_baked.png
 
-newmtl Material.003_NONE
-Ns 9.803922
+newmtl Material.001
+Ns 96.078431
 Ka 0.000000 0.000000 0.000000
-Kd 0.394455 0.394455 0.394455
-Ks 0.306931 0.306931 0.306931
-Ni 1.000000
+Kd 0.640000 0.640000 0.640000
+Ks 0.500000 0.500000 0.500000
 d 1.000000
 illum 2
+map_Kd wood_tex.jpg
+
+newmtl Material.002
+Ns 96.078431
+Ka 0.000000 0.000000 0.000000
+Kd 0.640000 0.640000 0.640000
+Ks 0.500000 0.500000 0.500000
+d 1.000000
+illum 2
+map_Kd ground_1024_baked.png
