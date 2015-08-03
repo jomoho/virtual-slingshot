@@ -166,8 +166,8 @@ NodeTransitPtr createScenegraph() {
 	NodeRecPtr root = Node::create();
 	root->setCore(Group::create());
 
-	NodeRecPtr boxChild = makeBox(5,4,4,1,1,1);
-	NodeRecPtr beach = makePlane(30000, 30000, 1, 1);
+	NodeRecPtr boxChild = makeBox(10,10,10,1,1,1);
+	NodeRecPtr beach = makePlane(10000, 10000, 1, 1);
 	//NodeRecPtr beach = SceneFileHandler::the()->read("models/landscape.obj");
 
 	GeometryRecPtr sunGeo = makeSphereGeo(2, 3);
@@ -245,6 +245,36 @@ NodeTransitPtr createScenegraph() {
 
 	landTrans = loadModel("models/landscape.obj");
 	root->addChild(landTrans);
+
+
+	shotTrans = loadModel("models/slingshot.obj", Vec3f(-12, 150, 0), 100.0f);
+	root->addChild(shotTrans);
+
+	standTrans = loadModel("models/stand.obj", Vec3f(0, 1, -200), 100.0f);
+	root->addChild(standTrans);
+	targetTrans = loadModel("models/target.obj", Vec3f(0, 150, -200), 100.0f, Quaternion(Vec3f(1,0,0),osgDegree2Rad(-90)));
+	standTrans->addChild(targetTrans);
+	
+	//root->addChild(targetTrans);
+
+
+
+	/*
+	NodeRecPtr palmTree = SceneFileHandler::the()->read("models/skybox.obj");
+
+	ComponentTransformRecPtr palmCT = ComponentTransform::create();
+	palmCT->setTranslation(Vec3f(12,0,0));
+	palmCT->setRotation(Quaternion(Vec3f(0,1,0),osgDegree2Rad(90)));
+	palmCT->setScale(Vec3f(10.f,10.f,10.f));
+
+	NodeRecPtr palmTrans = makeNodeFor(palmCT);
+
+	palmTrans->addChild(palmTree);
+	*/
+	NodeRecPtr skybox = loadModel("models/skybox.obj", Vec3f(12,0,0), 10.0f);
+	root->addChild(skybox);
+
+
 	/*
 	NodeRecPtr palmTree2 = OSG::deepCloneTree(palmTrans);
 	ComponentTransformRecPtr palmCT2 = dynamic_cast<ComponentTransform*>(palmTree2->getCore());
