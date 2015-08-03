@@ -54,6 +54,8 @@ NodeRecPtr root,
 		projectileTrans;
 
 
+NodeRecPtr beachTrans;
+
 auto head_orientation = Quaternion(Vec3f(0.f, 1.f, 0.f), 3.141f);
 auto head_position = Vec3f(0.f, 170.f, 200.f);	// a 1.7m Person 2m in front of the scene
 
@@ -101,6 +103,15 @@ void cleanup()
 	delete tracker;
 	delete button;
 	delete analog;
+
+	beachTrans = NULL;
+	mgr = NULL;
+	root = NULL; 
+	landTrans = NULL;
+	standTrans = NULL;
+	targetTrans = NULL;
+	shotTrans = NULL;
+	projectileTrans = NULL;
 }
 
 void print_tracker();
@@ -119,8 +130,24 @@ skybox.init(5,5,5, 1000, (skyPath+"Down2048.png").c_str(),
 
 NodeRecPtr loadModel(std::string filename, 
 	Vec3f trans = Vec3f(0,0,0), 
-	float scale = 100.0f, 
+	float scale = 1.0f, 
 	Quaternion rot = Quaternion(Vec3f(1,0,0),osgDegree2Rad(0))) {
+
+		/*
+
+	//model taken from http://storage3d.com/
+	NodeRecPtr palmTree = SceneFileHandler::the()->read("models/landscape.obj");
+
+	ComponentTransformRecPtr palmCT = ComponentTransform::create();
+	palmCT->setTranslation(Vec3f(0,0,0));
+	palmCT->setRotation(Quaternion(Vec3f(0,1,0),osgDegree2Rad(0)));
+	//palmCT->setScale(Vec3f(10.f,10.f,10.f));
+
+	NodeRecPtr palmTrans = makeNodeFor(palmCT);
+
+	palmTrans->addChild(palmTree);
+	
+	*/
 	
  	NodeRecPtr model = SceneFileHandler::the()->read(filename.c_str());
 
@@ -128,13 +155,138 @@ NodeRecPtr loadModel(std::string filename,
 	modelCT->setTranslation(trans);
 	modelCT->setRotation(rot);
 	modelCT->setScale( Vec3f(scale, scale, scale));
+
 	NodeRecPtr modelTrans = makeNodeFor(modelCT);
-	
+	modelTrans->addChild(model);
+
 	return modelTrans;
  }
 
+NodeTransitPtr createScenegraph() {
+	NodeRecPtr root = Node::create();
+	root->setCore(Group::create());
+
+	NodeRecPtr boxChild = makeBox(5,4,4,1,1,1);
+	NodeRecPtr beach = makePlane(30000, 30000, 1, 1);
+	//NodeRecPtr beach = SceneFileHandler::the()->read("models/landscape.obj");
+
+	GeometryRecPtr sunGeo = makeSphereGeo(2, 3);
+	NodeRecPtr sunChild = Node::create();
+	sunChild->setCore(sunGeo);
+
+	root->addChild(sunChild);
+	root->addChild(boxChild);
+	root->addChild(beach);
+
+	//decouple the nodes to be shifted in hierarchy from the scene
+	root->subChild(sunChild);
+	root->subChild(beach);
+
+	TransformRecPtr sunTransCore = Transform::create();
+	Matrix sunMatrix;
+
+	// Setting up the matrix
+	sunMatrix.setIdentity();
+	sunMatrix.setTranslate(0,20000,0);
+	sunTransCore->setMatrix(sunMatrix); // Adding the Matrix to the core
+
+	// Setting up the node
+	NodeRecPtr sunTrans = makeNodeFor(sunTransCore);
+	sunTrans->addChild(sunChild);
+
+	ComponentTransformRecPtr ct = ComponentTransform::create();
+	ct->setTranslation(Vec3f(0,-2,0));
+	ct->setRotation(Quaternion(Vec3f(1,0,0),osgDegree2Rad(90)));
+
+	beachTrans = Node::create();
+	beachTrans->setCore(ct);
+	beachTrans->addChild(beach);
+
+	// put the nodes in the scene again
+	//root->addChild(beachTrans);
+	root->addChild(sunTrans);
+	root->subChild(sunTrans);
+
+	SimpleMaterialRecPtr sunMat = SimpleMaterial::create();
+	sunMat->setDiffuse(Color3f(1,0.8f,0));
+	sunMat->setAmbient(Color3f(0.8f, 0.2f, 0.2f));
+
+	MaterialGroupRecPtr sunMgCore = MaterialGroup::create();
+	sunMgCore->setMaterial(sunMat);
+
+	NodeRecPtr sunMg = Node::create();
+
+	sunMg->setCore(sunMgCore);
+	sunMg->addChild(sunTrans);
+
+	root->addChild(sunMg);
+
+	SimpleMaterialRecPtr boxMat = SimpleMaterial::create();
+
+	boxMat->setDiffuse(Color3f(1,0.2f,0.1f));
+	boxMat->setAmbient(Color3f(0.8f, 0.2f, 0.2f));
+	boxMat->setTransparency(0.25);
+	//boxMat->setLit(false);
+
+	GeometryRecPtr boxGeo = dynamic_cast<Geometry*>(boxChild->getCore());
+	boxGeo->setMaterial(boxMat);
+
+	ImageRecPtr image = Image::create();
+	// sand taken from http://www.filterforge.com/filters/720.jpg
+	image->read("models/ground_1024_raw.jpg");
+
+	//now we create the texture that will hold the image
+	SimpleTexturedMaterialRecPtr tex = SimpleTexturedMaterial::create();
+	tex->setImage(image);
+
+	//now assign the fresh texture to the geometry
+	GeometryRecPtr beachGeo = dynamic_cast<Geometry*>(beach->getCore());
+	beachGeo->setMaterial(tex);
+
+	landTrans = loadModel("models/landscape.obj");
+	root->addChild(landTrans);
+	/*
+	NodeRecPtr palmTree2 = OSG::deepCloneTree(palmTrans);
+	ComponentTransformRecPtr palmCT2 = dynamic_cast<ComponentTransform*>(palmTree2->getCore());
+
+	palmCT2->setTranslation(Vec3f(10,-1,5));
+	palmCT->setRotation(Quaternion(Vec3f(1,0,0),osgDegree2Rad(0)));
+	palmCT->setScale(Vec3f(10.f,10.f,10.f));
+
+	root->addChild(palmTree2);
+	*/
+	PointLightRecPtr sunLight = PointLight::create();
+	//sunLight->setAttenuation(1,0,2);
+
+	//color information
+	sunLight->setDiffuse(Color4f(1,1,1,1));
+	sunLight->setAmbient(Color4f(0.2f,0.2f,0.2f,1));
+	sunLight->setSpecular(Color4f(1,1,1,1));
+
+	sunLight->setBeacon(sunChild); //attach to the sun node use this node as position beacon
+
+	root->setCore(sunLight);
+
+	DirectionalLightRecPtr dirLight = DirectionalLight::create();
+	dirLight->setDirection(1,1,-1);
+
+	//color information
+	dirLight->setDiffuse(Color4f(1,1,1,1));
+	dirLight->setAmbient(Color4f(0.2f,0.2f,0.2f,1));
+	dirLight->setSpecular(Color4f(1,1,1,1));
+
+
+	//wrap the root, cause only nodes below the lights will be lit
+	NodeRecPtr ueberroot = makeNodeFor(dirLight);
+	ueberroot->addChild(root);
+
+	root = ueberroot;
+	return NodeTransitPtr(root);
+}
+
 NodeTransitPtr buildScene() {
-	root = Node::create();
+	//root = Node::create();
+	/*
 	root->setCore(Group::create());
 
 	GeometryRecPtr sunGeo = makeSphereGeo(2, 3);
@@ -163,17 +315,18 @@ NodeTransitPtr buildScene() {
 	root->addChild(sunTrans);
 	root->subChild(sunTrans);
 	
-	landTrans = loadModel("models/landscape.obj");
-	standTrans = loadModel("models/stand.obj");
-	targetTrans = loadModel("models/target.obj", Vec3f(0,1.5f,0));
-	shotTrans = loadModel("models/slingshot.obj");
-	projectileTrans = loadModel("models/projectile.obj", Vec3f(0.0f), 1.0f);
+	//landTrans = loadModel("models/landscape.obj");
+	//standTrans = loadModel("models/stand.obj");
+	
+	//targetTrans = loadModel("models/target.obj", Vec3f(0,1.5f,0));
+	//shotTrans = loadModel("models/slingshot.obj");
+	projectileTrans = loadModel("models/projectile.obj", Vec3f(0.0f, 0.0f, -2.0f), 1.0f);
 	
 	
-	root->addChild(landTrans);
-	root->addChild(standTrans);
-	root->addChild(targetTrans);
-	root->addChild(shotTrans);
+	//root->addChild(landTrans);
+	//root->addChild(standTrans);
+	//root->addChild(targetTrans);
+	//root->addChild(shotTrans);
 	root->addChild(projectileTrans);
 
 			
@@ -207,7 +360,9 @@ NodeTransitPtr buildScene() {
 	//Skybox
 	//initSkybox();
 	//root->addChild(skybox.getNodePtr());
-	return NodeTransitPtr(root);
+	*/
+	//return NodeTransitPtr(root);
+	return createScenegraph();
 }
 
 #define PULL_LOOSE 0
@@ -232,7 +387,6 @@ void stopProjectile(Vec3f pos){
 	projSpeed = Vec3f(0,0,0);
 	projState = PROJ_DEAD;
 }
-
 
 void eventStartPull(){
 	if(pullState == PULL_GOING){
@@ -315,8 +469,6 @@ void updateProjectile(float dt){
 	ComponentTransformRecPtr pt = dynamic_cast<ComponentTransform*>(projectileTrans->getCore());
 	pt->setTranslation(projPos);
 }
-
-
 
 template<typename T>
 T scale_tracker2cm(const T& value)
@@ -407,10 +559,28 @@ void print_tracker()
 void keyboard(unsigned char k, int x, int y)
 {
 	Real32 ed;
+	float fac = 5.0f;
 	switch(k)
 	{
+		case 'r':
+			head_orientation = Quaternion(Vec3f(0,1,0),3.141f);
+			head_position = Vec3f(0.f, 170.f, 200.f);
+		break;
+		case 'w':
+			head_position += Vec3f(0,0, -1.0f)*fac;
+			break;
+		case 'a':
+			head_position += Vec3f(-1.0f,0,0)*fac;
+			break;
+		case 's':
+			head_position += Vec3f(0,0, 1.0f)*fac;
+			break;
+		case 'd':
+			head_position += Vec3f(1.0f,0,0 )*fac;
+			break;
 		case 'q':
 		case 27: 
+			//root->clearChildren();
 			cleanup();
 			exit(EXIT_SUCCESS);
 			break;
@@ -438,6 +608,7 @@ void keyboard(unsigned char k, int x, int y)
 
 //****** Update LOOP *******//
 void updateLoop(float dt){
+	/*
 	ComponentTransformRecPtr st = dynamic_cast<ComponentTransform*>(shotTrans->getCore());
 	st->setTranslation(schleuder_position);
 	st->setRotation(schleuder_orientation);
@@ -445,6 +616,8 @@ void updateLoop(float dt){
 	
 	updateSlinshot(dt);	
 	updateProjectile(dt);	
+	*/
+
 }
 
 void setupGLUT(int *argc, char *argv[])
@@ -466,8 +639,13 @@ void setupGLUT(int *argc, char *argv[])
 	glutKeyboardFunc(keyboard);
 
 	glutMouseFunc([](int button, int state, int x, int y) {
+		
+		float ang = 0.5f * ((float) (x-150));
 		if(state){
-			std::cout << "Mouse: " << x << ", "<< y << '\n';
+			head_orientation = Quaternion(Vec3f(0,1.f,0), 3.141f + osgDegree2Rad(ang));
+			
+			//rootTrans->setRotation(Quaternion(Vec3f(0,1,0),osgDegree2Rad(ang)));
+			std::cout << "Mouse: " << x << ", "<< y<< " angle: " << 3.141f + osgDegree2Rad(ang) << '\n';
 		}
 		glutPostRedisplay();
 	});
@@ -559,6 +737,7 @@ int main(int argc, char **argv)
 		mgr = new OSGCSM::CAVESceneManager(&cfg);
 		mgr->setWindow(mwin );
 		mgr->setRoot(scene);
+		mgr->setHeadlight(false);
 		mgr->showAll();
 		mgr->getWindow()->init();
 		mgr->turnWandOff();
