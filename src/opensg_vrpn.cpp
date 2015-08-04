@@ -24,8 +24,6 @@
 #include <OpenSG/OSGPointLight.h>
 #include <OpenSG/OSGSpotLight.h>
 
-//#include <inVRs/tools/libraries/Skybox/Skybox.h>
-
 #include <OSGCSM/OSGCAVESceneManager.h>
 #include <OSGCSM/OSGCAVEConfig.h>
 #include <OSGCSM/appctrl.h>
@@ -52,56 +50,42 @@ NodeRecPtr root,
 		landTrans,
 		standTrans,
 		targetTrans,
-		shotTrans,
+		slingTrans,
 		projectileTrans,
 		helpTrans, ttrans;
 
+NodeRecPtr stringTrans[2],
+			helperTrans[3]; 
 
 NodeRecPtr beachTrans;
 
-auto head_orientation = Quaternion(Vec3f(0.f, 1.f, 0.f), 3.141f);
-auto head_position = Vec3f(0.f, 170.f, 200.f);	// a 1.7m Person 2m in front of the scene
+auto headRot = Quaternion(Vec3f(0.f, 1.f, 0.f), 3.141f);
+auto headPos = Vec3f(0.f, 170.f, 200.f);	// a 1.7m Person 2m in front of the scene
 
-auto schleuder_orientation = Quaternion();
-auto schleuder_position =  Vec3f(-12, 150, 0);
+auto slingRot = Quaternion();
+auto slingPos =  Vec3f(-12, 150, 0);
 
-auto hand_orientation = Quaternion();
-auto hand_position =  Vec3f(0, 150, 0 );
+auto handRot = Quaternion();
+auto handPos =  Vec3f(0, 150, 0 );
 
 Vec3f projSpeed, projPos, targetPos = Vec3f(0, 160, -200);
 
-//Skybox skybox;
+#define SL_AIM 2
+#define SL_LEFT 0
+#define SL_RIGHT 1
 
-class Projectile {
-public: 
-	NodeRecPtr node;
-	NodeRecPtr	tr;
-	Vec3f dir;
-	void init(Vec3f pos, Vec3f dir_){
-
-		node = makeSphere(2, 3);
-		
-		root->addChild(node);
-		
-		root->subChild(node);
-		
-		ComponentTransformRecPtr ct = ComponentTransform::create();
-		ct->setTranslation(pos);
-		ct->setRotation(Quaternion(Vec3f(1,0,0),osgDegree2Rad(0)));
-
-		tr = Node::create();
-		tr->setCore(ct);
-		tr->addChild(node);
-		root->addChild(tr);
-
-		dir = dir_;
-	}
-
-	void update(int ticks){
-		Vec3f ad = dir * ((float) ticks) *0.01f;
-	}
+const Vec3f slingAimOff = Vec3f(0, 10, 0);
+const Vec3f slingLeftOff = Vec3f(-6.5f,0,0);
+const Vec3f slingRightOff = Vec3f(6.5f,0,0);
+Vec3f slingPoints[3] = {
+	slingPos + slingAimOff + slingLeftOff,
+	slingPos + slingAimOff + slingRightOff,
+	slingPos + slingAimOff,
 };
 
+int playerHit = 0, playerScore = 0;
+
+bool projOnTarget = false;
 void cleanup()
 {
 	delete mgr;
@@ -115,10 +99,16 @@ void cleanup()
 	landTrans = NULL;
 	standTrans = NULL;
 	targetTrans = NULL;
-	shotTrans = NULL;
+	slingTrans = NULL;
 	projectileTrans = NULL;
 	helpTrans = NULL;
+	stringTrans[0] =NULL;
+	stringTrans[1] =NULL;
 	ttrans= NULL;
+
+	helperTrans[0] = NULL;
+	helperTrans[1] = NULL;
+	helperTrans[2] = NULL;
 
 }
 
@@ -146,16 +136,25 @@ NodeRecPtr makeHelper(){
 	return ht;
 }
 
-void initSkybox() {
-std::string skyPath ="models/ThickCloudsWater/ThickCloudsWater";
-/*
-skybox.init(5,5,5, 1000, (skyPath+"Down2048.png").c_str(),
-		(skyPath+"Up2048.png").c_str(),
-		(skyPath+"Front2048.png").c_str(),
-		(skyPath+"Back2048.png").c_str(),
-		(skyPath+"Right2048.png").c_str(),
-		(skyPath+"Left2048.png").c_str());
-		*/
+NodeRecPtr makeString(){
+	NodeRecPtr boxChild = makeCylinder(1,1,6,true,true,true);
+	SimpleMaterialRecPtr boxMat = SimpleMaterial::create();
+
+	boxMat->setDiffuse(Color3f(1,0.2f,0.1f));
+	boxMat->setAmbient(Color3f(1.f, 0.2f, 0.2f));
+	//boxMat->setLit(false);
+
+	GeometryRecPtr boxGeo = dynamic_cast<Geometry*>(boxChild->getCore());
+	boxGeo->setMaterial(boxMat);
+	
+	ComponentTransformRecPtr bt = ComponentTransform::create();
+	bt->setTranslation(Vec3f(0.f));
+	bt->setRotation(Quaternion(Vec3f(1,0,0),osgDegree2Rad(0)));
+
+	NodeRecPtr ht = Node::create();
+	ht->setCore(bt);
+	ht->addChild(boxChild);
+	return ht;
 }
 
 NodeRecPtr loadModel(std::string filename, 
@@ -192,32 +191,45 @@ NodeRecPtr loadModel(std::string filename,
 	return modelTrans;
  }
 
+void calcSlingPoints(){
+	Vec3f tmpAim = Vec3f(0,0,0);
+	slingRot.multVec(slingAimOff, tmpAim);
+	
+	Vec3f tmpLeft = Vec3f(0,0,0);
+	slingRot.multVec(slingAimOff+slingLeftOff, tmpLeft);
+	
+	Vec3f tmpRight = Vec3f(0,0,0);
+	slingRot.multVec(slingAimOff+slingRightOff, tmpRight);
+
+
+	slingPoints[SL_AIM]= slingPos + tmpAim;
+	slingPoints[SL_LEFT]= slingPos + tmpLeft;
+	slingPoints[SL_RIGHT]= slingPos + tmpRight;
+
+
+}
+
 NodeTransitPtr createScenegraph() {
 	NodeRecPtr root = Node::create();
 	root->setCore(Group::create());
 
-	NodeRecPtr boxChild = makeBox(5,5,5,1,1,1);
-	SimpleMaterialRecPtr boxMat = SimpleMaterial::create();
-
-	boxMat->setDiffuse(Color3f(1,0.2f,0.1f));
-	boxMat->setAmbient(Color3f(0.8f, 0.2f, 0.2f));
-	boxMat->setTransparency(0.25);
-	//boxMat->setLit(false);
-
-	GeometryRecPtr boxGeo = dynamic_cast<Geometry*>(boxChild->getCore());
-	boxGeo->setMaterial(boxMat);
-	
-	ComponentTransformRecPtr bt = ComponentTransform::create();
-	bt->setTranslation(hand_position);
-	bt->setRotation(Quaternion(Vec3f(1,0,0),osgDegree2Rad(0)));
-
-	helpTrans = Node::create();
-	helpTrans->setCore(bt);
-	helpTrans->addChild(boxChild);
+	helpTrans = makeHelper();
 	root->addChild(helpTrans);
+
+	helperTrans[0] = makeHelper();
+	root->addChild(helperTrans[0]);
+	helperTrans[1] = makeHelper();
+	root->addChild(helperTrans[1]);
+	helperTrans[2] = makeHelper();
+	root->addChild(helperTrans[2]);
 
 	ttrans = makeHelper();	
 	root->addChild(ttrans);
+
+	stringTrans[0] = makeString();
+	stringTrans[1] = makeString();
+	root->addChild(stringTrans[0]);
+	root->addChild(stringTrans[1]);
 
 	NodeRecPtr beach = makePlane(10000, 10000, 1, 1);
 	//NodeRecPtr beach = SceneFileHandler::the()->read("models/landscape.obj");
@@ -289,8 +301,8 @@ NodeTransitPtr createScenegraph() {
 	landTrans = loadModel("models/landscape.obj");
 	root->addChild(landTrans);
 
-	shotTrans = loadModel("models/slingshot.obj",schleuder_position, 100.0f);
-	root->addChild(shotTrans);
+	slingTrans = loadModel("models/slingshot.obj",slingPos, 1.0f);
+	root->addChild(slingTrans);
 	
 	projectileTrans = loadModel("models/projectile.obj");
 	root->addChild(projectileTrans);
@@ -298,7 +310,7 @@ NodeTransitPtr createScenegraph() {
 	standTrans = loadModel("models/stand.obj", targetPos - Vec3f(0, 159,0), 100.0f);
 	root->addChild(standTrans);
 
-	targetTrans = loadModel("models/target.obj", targetPos, 100.0f, Quaternion(Vec3f(1,0,0),osgDegree2Rad(-90)));
+	targetTrans = loadModel("models/target.obj", targetPos, 1.0f, Quaternion(Vec3f(1,0,0),osgDegree2Rad(0)));
 	//standTrans->addChild(targetTrans);
 	
 	root->addChild(targetTrans);
@@ -374,7 +386,6 @@ int pullState = PULL_LOOSE;
 int projState = PROJ_DEAD;
 
 
-
 void startProjectile(Vec3f pos, Vec3f dir){
 	projPos = pos;
 	projSpeed = dir*20.f;
@@ -397,14 +408,15 @@ void eventStartPull(){
 		return;
 	}
 	
-	Vec3f d1 = schleuder_position - hand_position;
-	Vec3f d2 = schleuder_position - head_position;
+	Vec3f d1 = slingPos - handPos;
+	Vec3f d2 = slingPos - headPos;
 	float dot =  d1.dot(d2);
 	float len = d1.length();
 	std::cout << "dot: " << dot<< " length: " << len << std::endl;
 	if( len <= 30.0f && len >= 5.f && dot > 0){
 		pullState = PULL_GOING;
 		projState = PROJ_PULL;
+		projOnTarget = false;
 
 		std::cout << "start pull" << std::endl;
 	}
@@ -415,8 +427,8 @@ void eventStopPull(){
 		return;
 	}
 	
-	Vec3f d1 = schleuder_position - hand_position;	
-	startProjectile(hand_position, d1);
+	Vec3f d1 = slingPoints[SL_AIM] - handPos;	
+	startProjectile(handPos, d1);
 	pullState = PULL_LOOSE;
 	
 	std::cout << "stop pull" << std::endl;
@@ -429,16 +441,29 @@ void updateTarget(){
 	ttt->setTranslation(targetPos);
 	ComponentTransformRecPtr st = dynamic_cast<ComponentTransform*>(standTrans->getCore());
 	st->setTranslation(targetPos- Vec3f(0, 159,0));
+
+	if(projOnTarget == true){
+		Vec3f v = Vec3f(projPos[0], projPos[1], targetPos[2]);
+		ComponentTransformRecPtr pt = dynamic_cast<ComponentTransform*>(projectileTrans->getCore());
+		pt->setTranslation(v);
+	}
 }
 
 void updateSlingshot(float dt){
-	ComponentTransformRecPtr st = dynamic_cast<ComponentTransform*>(shotTrans->getCore());
-	st->setTranslation(schleuder_position);
-	st->setRotation(schleuder_orientation);
+	calcSlingPoints();
+
+	for(int i = 0; i < 3; i++){
+		ComponentTransformRecPtr hlpt = dynamic_cast<ComponentTransform*>(helperTrans[i]->getCore());
+		hlpt->setTranslation(slingPoints[i]);		
+	}
+
+	ComponentTransformRecPtr st = dynamic_cast<ComponentTransform*>(slingTrans->getCore());
+	st->setTranslation(slingPos);
+	st->setRotation(slingRot);
 
 	ComponentTransformRecPtr ht = dynamic_cast<ComponentTransform*>(helpTrans->getCore());
-	ht->setTranslation(hand_position);
-	ht->setRotation(hand_orientation);
+	ht->setTranslation(handPos);
+	ht->setRotation(handRot);
 
 	if(pullState == PULL_GOING){
 		//update slingshot
@@ -456,7 +481,7 @@ void updateProjectile(float dt){
 	}	
 	
 	if(projState == PROJ_PULL){
-		projPos = hand_position;
+		projPos = handPos;
 	}
 	
 	if(projState == PROJ_FLY){	
@@ -478,13 +503,26 @@ void updateProjectile(float dt){
 			Vec3f inter = projPos + (d*t);
 		
 			Vec3f d2	= targetPos - inter;
-			float targetSize = 100.0f;
-			if(d2.length() <= targetSize){
-				float score = targetSize - d2.length();
-				std::cout << "hit target: " << score << std::endl;
+			float targetSize = 50.0f;
+			float dist = d2.length();
+			if(dist <= targetSize){
+				int scores[] = {100,75,50,20,10};
+				std::string colors[] = {"yellow", "red", "blue", "black", "white"};
+				int s = (int) (dist/targetSize * 5.f);
+				playerScore += scores[s];
+				playerHit = s+1;
+				std::cout << "hit target: " << scores[s] << "color: " << colors[s] << std::endl;
 				stopProjectile(inter);
+				projOnTarget = true;
+			}else{				
+				playerHit = 6;
+				std::cout << "missed target at: " << projPos << " || "<< nPos << std::endl;
 			}
-		} else if (nPos[VY] <= 0.0f){//check if floor is hit 
+		} else {
+			projPos = nPos;
+		}
+		
+		if (nPos[VY] <= 0.0f){//check if floor is hit 
 			Vec3f d = nPos - projPos;
 			float t = (0.0f - (float) projPos[VY]) / d[VY];		
 			//calc the intersection point:
@@ -492,7 +530,6 @@ void updateProjectile(float dt){
 			std::cout << "hit floor: "<< nPos << std::endl;
 			stopProjectile(inter);
 		} else {
-			//std::cout << ;
 			projPos = nPos;
 		}
 	}
@@ -511,18 +548,18 @@ T scale_tracker2cm(const T& value)
 }
 void VRPN_CALLBACK callback_head_tracker(void* userData, const vrpn_TRACKERCB tracker)
 {
-	head_orientation = Quaternion(tracker.quat[0], tracker.quat[1], tracker.quat[2], tracker.quat[3]);
-	head_position = Vec3f(scale_tracker2cm(Vec3d(tracker.pos)));
+	headRot = Quaternion(tracker.quat[0], tracker.quat[1], tracker.quat[2], tracker.quat[3]);
+	headPos = Vec3f(scale_tracker2cm(Vec3d(tracker.pos)));
 }
 void VRPN_CALLBACK callback_schleuder_tracker(void* userData, const vrpn_TRACKERCB tracker)
 {
-	schleuder_orientation = Quaternion(tracker.quat[0], tracker.quat[1], tracker.quat[2], tracker.quat[3]);
-	schleuder_position = Vec3f(scale_tracker2cm(Vec3d(tracker.pos)));
+	slingRot = Quaternion(tracker.quat[0], tracker.quat[1], tracker.quat[2], tracker.quat[3]);
+	slingPos = Vec3f(scale_tracker2cm(Vec3d(tracker.pos)));
 }
 void VRPN_CALLBACK callback_hand_tracker(void* userData, const vrpn_TRACKERCB tracker)
 {
-	hand_orientation = Quaternion(tracker.quat[0], tracker.quat[1], tracker.quat[2], tracker.quat[3]);
-	hand_position = Vec3f(scale_tracker2cm(Vec3d(tracker.pos)));
+	handRot = Quaternion(tracker.quat[0], tracker.quat[1], tracker.quat[2], tracker.quat[3]);
+	handPos = Vec3f(scale_tracker2cm(Vec3d(tracker.pos)));
 }
 void VRPN_CALLBACK callback_analog(void* userData, const vrpn_ANALOGCB analog)
 {
@@ -573,9 +610,9 @@ void check_tracker()
 
 void print_tracker()
 {
-	std::cout << "Head position: " << head_position << " orientation: " << head_orientation << '\n';
-	std::cout << "Schleuder position: " << schleuder_position << " orientation: " << schleuder_orientation << '\n';
-	std::cout << "Hand position: " << hand_position << " orientation: " << hand_orientation << '\n';
+	std::cout << "Head position: " << headPos << " orientation: " << headRot << '\n';
+	std::cout << "Schleuder position: " << slingPos << " orientation: " << slingRot << '\n';
+	std::cout << "Hand position: " << handPos << " orientation: " << handRot << '\n';
 	std::cout << "Analog: " << analog_values << '\n';
 }
 
@@ -598,32 +635,32 @@ void keyboard(unsigned char k, int x, int y)
 			targetPos += Vec3f(0,0, 1.0f)*fac;
 		break;
 		case 't':
-			schleuder_position += Vec3f(0,0, -1.0f)*fac;
+			slingPos += Vec3f(0,0, -1.0f)*fac;
 		break;
 		case 'g':
-			schleuder_position += Vec3f(0,0, 1.0f)*fac;
+			slingPos += Vec3f(0,0, 1.0f)*fac;
 		break;
 		case 'c':
-			hand_position += Vec3f(-1,0, 0)*fac;
+			handPos += Vec3f(-1,0, 0)*fac;
 		break;
 		case 'v':			
-			hand_position += Vec3f(1,0, 0)*fac;
+			handPos += Vec3f(1,0, 0)*fac;
 		break;
 		case 'r':
-			head_orientation = Quaternion(Vec3f(0,1,0),3.141f);
-			head_position = Vec3f(0.f, 170.f, 200.f);
+			headRot = Quaternion(Vec3f(0,1,0),3.141f);
+			headPos = Vec3f(0.f, 170.f, 200.f);
 		break;
 		case 'w':
-			head_position += Vec3f(0,0, -1.0f)*fac;
+			headPos += Vec3f(0,0, -1.0f)*fac;
 			break;
 		case 'a':
-			head_position += Vec3f(-1.0f,0,0)*fac;
+			headPos += Vec3f(-1.0f,0,0)*fac;
 			break;
 		case 's':
-			head_position += Vec3f(0,0, 1.0f)*fac;
+			headPos += Vec3f(0,0, 1.0f)*fac;
 			break;
 		case 'd':
-			head_position += Vec3f(1.0f,0,0 )*fac;
+			headPos += Vec3f(1.0f,0,0 )*fac;
 			break;
 		case 'q':
 		case 27: 
@@ -684,12 +721,15 @@ void setupGLUT(int *argc, char *argv[])
 
 	glutMouseFunc([](int button, int state, int x, int y) {
 		
-		float ang = 0.5f * ((float) (x-150));
+		float angY = 0.5f * ((float) (x-150));
+		float angX = 0.5f * ((float) (y-150));
 		if(state){
-			head_orientation = Quaternion(Vec3f(0,1.f,0), 3.141f + osgDegree2Rad(ang));
+			slingRot = Quaternion(Vec3f(0,1.f,0), osgDegree2Rad(angY));
+
+			slingRot *= Quaternion(Vec3f(1.f,0, 0), osgDegree2Rad(angX));
 			
 			//rootTrans->setRotation(Quaternion(Vec3f(0,1,0),osgDegree2Rad(ang)));
-			std::cout << "Mouse: " << x << ", "<< y<< " angle: " << 3.141f + osgDegree2Rad(ang) << '\n';
+			std::cout << "Mouse: " << x << ", "<< y<< " angleY: " <<  angY << " angleX: "<< angX << '\n';
 		}
 		glutPostRedisplay();
 	});
@@ -699,7 +739,7 @@ void setupGLUT(int *argc, char *argv[])
 
 		check_tracker();
 		const auto speed = 1.f;
-		mgr->setUserTransform(head_position, head_orientation);
+		mgr->setUserTransform(headPos, headRot);
 		mgr->setTranslation(mgr->getTranslation() + speed * analog_values);
 		t_last = t_now;
 		t_now= std::chrono::high_resolution_clock::now();

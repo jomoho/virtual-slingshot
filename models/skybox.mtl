@@ -1,0 +1,47 @@
+# Blender MTL File: 'skybox.blend'
+# Material Count: 5
+
+newmtl front
+Ns 96.078431
+Ka 0.000000 0.000000 0.000000
+Kd 0.077785 0.640000 0.042506
+Ks 0.500000 0.500000 0.500000
+d 1.000000
+illum 0
+map_Kd ThickCloudsWater/ThickCloudsWaterFront2048.png
+
+newmtl left
+Ns 96.078431
+Ka 0.000000 0.000000 0.000000
+Kd 0.640000 0.640000 0.640000
+Ks 0.500000 0.500000 0.500000
+d 1.000000
+illum 0
+map_Kd ThickCloudsWater/ThickCloudsWaterLeft2048.png
+
+newmtl rear
+Ns 96.078431
+Ka 0.000000 0.000000 0.000000
+Kd 0.640000 0.048081 0.142794
+Ks 0.500000 0.500000 0.500000
+d 1.000000
+illum 0
+map_Kd ThickCloudsWater/ThickCloudsWaterBack2048.png
+
+newmtl right
+Ns 96.078431
+Ka 0.000000 0.000000 0.000000
+Kd 0.626235 0.640000 0.030060
+Ks 0.500000 0.500000 0.500000
+d 1.000000
+illum 0
+map_Kd ThickCloudsWater/ThickCloudsWaterRight2048.png
+
+newmtl top
+Ns 96.078431
+Ka 0.000000 0.000000 0.000000
+Kd 0.000000 0.006267 0.640000
+Ks 0.500000 0.500000 0.500000
+d 1.000000
+illum 0
+map_Kd ThickCloudsWater/ThickCloudsWaterUp2048.png
