@@ -3,6 +3,7 @@
 #include <cmath>
 #include <iostream>
 #include <ios>
+#include <chrono>
 #include <ctime>
 
 #include <OpenSG/OSGGLUT.h>
@@ -45,13 +46,15 @@ OSGCSM::CAVESceneManager *mgr = nullptr;
 vrpn_Tracker_Remote* tracker =  nullptr;
 vrpn_Button_Remote* button = nullptr;
 vrpn_Analog_Remote* analog = nullptr;
+auto analog_values = Vec3f();
 
 NodeRecPtr root, 
 		landTrans,
 		standTrans,
 		targetTrans,
 		shotTrans,
-		projectileTrans;
+		projectileTrans,
+		helpTrans, ttrans;
 
 
 NodeRecPtr beachTrans;
@@ -60,10 +63,12 @@ auto head_orientation = Quaternion(Vec3f(0.f, 1.f, 0.f), 3.141f);
 auto head_position = Vec3f(0.f, 170.f, 200.f);	// a 1.7m Person 2m in front of the scene
 
 auto schleuder_orientation = Quaternion();
-auto schleuder_position = Vec3f();
+auto schleuder_position =  Vec3f(-12, 150, 0);
 
 auto hand_orientation = Quaternion();
-auto hand_position = Vec3f();
+auto hand_position =  Vec3f(0, 150, 0 );
+
+Vec3f projSpeed, projPos, targetPos = Vec3f(0, 160, -200);
 
 //Skybox skybox;
 
@@ -112,9 +117,34 @@ void cleanup()
 	targetTrans = NULL;
 	shotTrans = NULL;
 	projectileTrans = NULL;
+	helpTrans = NULL;
+	ttrans= NULL;
+
 }
 
 void print_tracker();
+
+NodeRecPtr makeHelper(){
+	NodeRecPtr boxChild = makeBox(5,5,5,1,1,1);
+	SimpleMaterialRecPtr boxMat = SimpleMaterial::create();
+
+	boxMat->setDiffuse(Color3f(1,0.2f,0.1f));
+	boxMat->setAmbient(Color3f(0.8f, 0.2f, 0.2f));
+	boxMat->setTransparency(0.25);
+	//boxMat->setLit(false);
+
+	GeometryRecPtr boxGeo = dynamic_cast<Geometry*>(boxChild->getCore());
+	boxGeo->setMaterial(boxMat);
+	
+	ComponentTransformRecPtr bt = ComponentTransform::create();
+	bt->setTranslation(Vec3f(0.f));
+	bt->setRotation(Quaternion(Vec3f(1,0,0),osgDegree2Rad(0)));
+
+	NodeRecPtr ht = Node::create();
+	ht->setCore(bt);
+	ht->addChild(boxChild);
+	return ht;
+}
 
 void initSkybox() {
 std::string skyPath ="models/ThickCloudsWater/ThickCloudsWater";
@@ -166,7 +196,29 @@ NodeTransitPtr createScenegraph() {
 	NodeRecPtr root = Node::create();
 	root->setCore(Group::create());
 
-	NodeRecPtr boxChild = makeBox(10,10,10,1,1,1);
+	NodeRecPtr boxChild = makeBox(5,5,5,1,1,1);
+	SimpleMaterialRecPtr boxMat = SimpleMaterial::create();
+
+	boxMat->setDiffuse(Color3f(1,0.2f,0.1f));
+	boxMat->setAmbient(Color3f(0.8f, 0.2f, 0.2f));
+	boxMat->setTransparency(0.25);
+	//boxMat->setLit(false);
+
+	GeometryRecPtr boxGeo = dynamic_cast<Geometry*>(boxChild->getCore());
+	boxGeo->setMaterial(boxMat);
+	
+	ComponentTransformRecPtr bt = ComponentTransform::create();
+	bt->setTranslation(hand_position);
+	bt->setRotation(Quaternion(Vec3f(1,0,0),osgDegree2Rad(0)));
+
+	helpTrans = Node::create();
+	helpTrans->setCore(bt);
+	helpTrans->addChild(boxChild);
+	root->addChild(helpTrans);
+
+	ttrans = makeHelper();	
+	root->addChild(ttrans);
+
 	NodeRecPtr beach = makePlane(10000, 10000, 1, 1);
 	//NodeRecPtr beach = SceneFileHandler::the()->read("models/landscape.obj");
 
@@ -175,7 +227,6 @@ NodeTransitPtr createScenegraph() {
 	sunChild->setCore(sunGeo);
 
 	root->addChild(sunChild);
-	root->addChild(boxChild);
 	root->addChild(beach);
 
 	//decouple the nodes to be shifted in hierarchy from the scene
@@ -221,15 +272,7 @@ NodeTransitPtr createScenegraph() {
 
 	root->addChild(sunMg);
 
-	SimpleMaterialRecPtr boxMat = SimpleMaterial::create();
-
-	boxMat->setDiffuse(Color3f(1,0.2f,0.1f));
-	boxMat->setAmbient(Color3f(0.8f, 0.2f, 0.2f));
-	boxMat->setTransparency(0.25);
-	//boxMat->setLit(false);
-
-	GeometryRecPtr boxGeo = dynamic_cast<Geometry*>(boxChild->getCore());
-	boxGeo->setMaterial(boxMat);
+	
 
 	ImageRecPtr image = Image::create();
 	// sand taken from http://www.filterforge.com/filters/720.jpg
@@ -246,16 +289,19 @@ NodeTransitPtr createScenegraph() {
 	landTrans = loadModel("models/landscape.obj");
 	root->addChild(landTrans);
 
-
-	shotTrans = loadModel("models/slingshot.obj", Vec3f(-12, 150, 0), 100.0f);
+	shotTrans = loadModel("models/slingshot.obj",schleuder_position, 100.0f);
 	root->addChild(shotTrans);
-
-	standTrans = loadModel("models/stand.obj", Vec3f(0, 1, -200), 100.0f);
-	root->addChild(standTrans);
-	targetTrans = loadModel("models/target.obj", Vec3f(0, 150, -200), 100.0f, Quaternion(Vec3f(1,0,0),osgDegree2Rad(-90)));
-	standTrans->addChild(targetTrans);
 	
-	//root->addChild(targetTrans);
+	projectileTrans = loadModel("models/projectile.obj");
+	root->addChild(projectileTrans);
+
+	standTrans = loadModel("models/stand.obj", targetPos - Vec3f(0, 159,0), 100.0f);
+	root->addChild(standTrans);
+
+	targetTrans = loadModel("models/target.obj", targetPos, 100.0f, Quaternion(Vec3f(1,0,0),osgDegree2Rad(-90)));
+	//standTrans->addChild(targetTrans);
+	
+	root->addChild(targetTrans);
 
 
 
@@ -298,7 +344,7 @@ NodeTransitPtr createScenegraph() {
 	root->setCore(sunLight);
 
 	DirectionalLightRecPtr dirLight = DirectionalLight::create();
-	dirLight->setDirection(1,1,-1);
+	dirLight->setDirection(0,-1,0);
 
 	//color information
 	dirLight->setDiffuse(Color4f(1,1,1,1));
@@ -315,83 +361,6 @@ NodeTransitPtr createScenegraph() {
 }
 
 NodeTransitPtr buildScene() {
-	//root = Node::create();
-	/*
-	root->setCore(Group::create());
-
-	GeometryRecPtr sunGeo = makeSphereGeo(2, 3);
-	NodeRecPtr sunChild = Node::create();
-	sunChild->setCore(sunGeo);
-	root->addChild(sunChild);
-
-
-	//decouple the nodes to be shifted in hierarchy from the scene
-	root->subChild(sunChild);
-
-	TransformRecPtr sunTransCore = Transform::create();
-	Matrix sunMatrix;
-
-	// Setting up the matrix
-	sunMatrix.setIdentity();
-	sunMatrix.setTranslate(0,20,0);
-	sunTransCore->setMatrix(sunMatrix); // Adding the Matrix to the core
-
-	// Setting up the node
-	NodeRecPtr sunTrans = makeNodeFor(sunTransCore);
-	sunTrans->addChild(sunChild);
-
-
-	// put the nodes in the scene again
-	root->addChild(sunTrans);
-	root->subChild(sunTrans);
-	
-	//landTrans = loadModel("models/landscape.obj");
-	//standTrans = loadModel("models/stand.obj");
-	
-	//targetTrans = loadModel("models/target.obj", Vec3f(0,1.5f,0));
-	//shotTrans = loadModel("models/slingshot.obj");
-	projectileTrans = loadModel("models/projectile.obj", Vec3f(0.0f, 0.0f, -2.0f), 1.0f);
-	
-	
-	//root->addChild(landTrans);
-	//root->addChild(standTrans);
-	//root->addChild(targetTrans);
-	//root->addChild(shotTrans);
-	root->addChild(projectileTrans);
-
-			
-	PointLightRecPtr sunLight = PointLight::create();
-	//sunLight->setAttenuation(1,0,2);
-
-	//color information
-	sunLight->setDiffuse(Color4f(1,1,1,1));
-	sunLight->setAmbient(Color4f(0.2f,0.2f,0.2f,1));
-	sunLight->setSpecular(Color4f(1,1,1,1));
-
-	sunLight->setBeacon(sunChild); //attach to the sun node use this node as position beacon
-
-	root->setCore(sunLight);
-
-	DirectionalLightRecPtr dirLight = DirectionalLight::create();
-	dirLight->setDirection(1,1,-1);
-
-	//color information
-	dirLight->setDiffuse(Color4f(1,1,1,1));
-	dirLight->setAmbient(Color4f(0.2f,0.2f,0.2f,1));
-	dirLight->setSpecular(Color4f(1,1,1,1));
-
-
-	//wrap the root, cause only nodes below the lights will be lit
-	NodeRecPtr ueberroot = makeNodeFor(dirLight);
-	ueberroot->addChild(root);
-
-	root = ueberroot;
-
-	//Skybox
-	//initSkybox();
-	//root->addChild(skybox.getNodePtr());
-	*/
-	//return NodeTransitPtr(root);
 	return createScenegraph();
 }
 
@@ -404,18 +373,23 @@ int pullState = PULL_LOOSE;
 #define PROJ_PULL 2
 int projState = PROJ_DEAD;
 
-Vec3f projSpeed, projPos, targetPos;
+
 
 void startProjectile(Vec3f pos, Vec3f dir){
 	projPos = pos;
-	projSpeed = dir;
+	projSpeed = dir*20.f;
 	projState = PROJ_FLY;
+	
+	std::cout << "start projectile" << std::endl;
+	std::cout << "projPos: "<< projPos << " 0: "<< projPos[0] << " 1: " << projPos[1] << " 2: " << projPos[2] << std::endl;
+	std::cout << "projPos: "<< projPos << " projSpeed: "<< projSpeed << std::endl;
 }
 
 void stopProjectile(Vec3f pos){
 	projPos = pos;
 	projSpeed = Vec3f(0,0,0);
 	projState = PROJ_DEAD;
+	std::cout << "stop projectile" << std::endl;
 }
 
 void eventStartPull(){
@@ -425,11 +399,14 @@ void eventStartPull(){
 	
 	Vec3f d1 = schleuder_position - hand_position;
 	Vec3f d2 = schleuder_position - head_position;
-	std::cout << "dot: " << d1.dot(d2) << std::endl;
-	
-	if(d1.length() <= 30.0f){
+	float dot =  d1.dot(d2);
+	float len = d1.length();
+	std::cout << "dot: " << dot<< " length: " << len << std::endl;
+	if( len <= 30.0f && len >= 5.f && dot > 0){
 		pullState = PULL_GOING;
 		projState = PROJ_PULL;
+
+		std::cout << "start pull" << std::endl;
 	}
 }
 
@@ -441,9 +418,28 @@ void eventStopPull(){
 	Vec3f d1 = schleuder_position - hand_position;	
 	startProjectile(hand_position, d1);
 	pullState = PULL_LOOSE;
+	
+	std::cout << "stop pull" << std::endl;
 }
 
-void updateSlinshot(float dt){
+void updateTarget(){
+	ComponentTransformRecPtr tt = dynamic_cast<ComponentTransform*>(targetTrans->getCore());
+	tt->setTranslation(targetPos);
+	ComponentTransformRecPtr ttt = dynamic_cast<ComponentTransform*>(ttrans->getCore());
+	ttt->setTranslation(targetPos);
+	ComponentTransformRecPtr st = dynamic_cast<ComponentTransform*>(standTrans->getCore());
+	st->setTranslation(targetPos- Vec3f(0, 159,0));
+}
+
+void updateSlingshot(float dt){
+	ComponentTransformRecPtr st = dynamic_cast<ComponentTransform*>(shotTrans->getCore());
+	st->setTranslation(schleuder_position);
+	st->setRotation(schleuder_orientation);
+
+	ComponentTransformRecPtr ht = dynamic_cast<ComponentTransform*>(helpTrans->getCore());
+	ht->setTranslation(hand_position);
+	ht->setRotation(hand_orientation);
+
 	if(pullState == PULL_GOING){
 		//update slingshot
 	}else if(pullState == PULL_LOOSE){
@@ -451,6 +447,9 @@ void updateSlinshot(float dt){
 	}
 }
 
+#define VX 0
+#define VY 1
+#define VZ 2
 void updateProjectile(float dt){
 	if(projState == PROJ_DEAD){
 		return;
@@ -461,17 +460,20 @@ void updateProjectile(float dt){
 	}
 	
 	if(projState == PROJ_FLY){	
-		float fact = 1.0f;
-		Vec3f gravity = Vec3f(0.0f, 98.1f, 0.0f);
-	
+		float fact = 0.2f;
+		Vec3f gravity = Vec3f(0.0f, -981.f, 0.0f);
+		projSpeed += gravity * dt * fact;
 		//new position
-		Vec3f nPos = projPos + (projSpeed * dt * fact) + (gravity * dt) ;
-	
+		Vec3f nPos = projPos + (projSpeed * dt * fact) ;
+		
+
+		//std::cout << "projPos: "<< projPos << " projSpeed: "<< projSpeed << " nPos: " << nPos << std::endl;
 		//check if target is hit:
 		//the flight direction	
-		if (targetPos[3] < projPos[3] && targetPos[3] > nPos[3]){
+	
+		if (targetPos[VZ] < projPos[VZ] && targetPos[VZ] > nPos[VZ]){
 			Vec3f d = nPos - projPos;
-			float t = (targetPos[3] - projPos[3]) / d[3];		
+			float t = (targetPos[VZ] - projPos[VZ]) / d[3];		
 			//calc the intersection point:
 			Vec3f inter = projPos + (d*t);
 		
@@ -481,19 +483,20 @@ void updateProjectile(float dt){
 				float score = targetSize - d2.length();
 				std::cout << "hit target: " << score << std::endl;
 				stopProjectile(inter);
-			}	
-		}
-	
-		//check if floor is hit 
-		if (nPos[2] <= 0.0f){
+			}
+		} else if (nPos[VY] <= 0.0f){//check if floor is hit 
 			Vec3f d = nPos - projPos;
-			float t = (0.0f - (float) projPos[2]) / d[2];		
+			float t = (0.0f - (float) projPos[VY]) / d[VY];		
 			//calc the intersection point:
 			Vec3f inter = projPos + (d*t);
-			std::cout << "hit floor: " << std::endl;
+			std::cout << "hit floor: "<< nPos << std::endl;
 			stopProjectile(inter);
+		} else {
+			//std::cout << ;
+			projPos = nPos;
 		}
 	}
+	
 	
 	//update position finally	
 	ComponentTransformRecPtr pt = dynamic_cast<ComponentTransform*>(projectileTrans->getCore());
@@ -506,35 +509,27 @@ T scale_tracker2cm(const T& value)
 	static const float scale = OSGCSM::convert_length(cfg.getUnits(), 1.f, OSGCSM::CAVEConfig::CAVEUnitCentimeters);
 	return value * scale;
 }
-
-
 void VRPN_CALLBACK callback_head_tracker(void* userData, const vrpn_TRACKERCB tracker)
 {
 	head_orientation = Quaternion(tracker.quat[0], tracker.quat[1], tracker.quat[2], tracker.quat[3]);
 	head_position = Vec3f(scale_tracker2cm(Vec3d(tracker.pos)));
 }
-
-
 void VRPN_CALLBACK callback_schleuder_tracker(void* userData, const vrpn_TRACKERCB tracker)
 {
 	schleuder_orientation = Quaternion(tracker.quat[0], tracker.quat[1], tracker.quat[2], tracker.quat[3]);
 	schleuder_position = Vec3f(scale_tracker2cm(Vec3d(tracker.pos)));
 }
-
 void VRPN_CALLBACK callback_hand_tracker(void* userData, const vrpn_TRACKERCB tracker)
 {
 	hand_orientation = Quaternion(tracker.quat[0], tracker.quat[1], tracker.quat[2], tracker.quat[3]);
 	hand_position = Vec3f(scale_tracker2cm(Vec3d(tracker.pos)));
 }
-
-auto analog_values = Vec3f();
 void VRPN_CALLBACK callback_analog(void* userData, const vrpn_ANALOGCB analog)
 {
 	if (analog.num_channel >= 2){
 		analog_values = Vec3f(analog.channel[0], 0, -analog.channel[1]);
 	}
 }
-
 void VRPN_CALLBACK callback_button(void* userData, const vrpn_BUTTONCB button)
 {
 	if (button.button == 0 && button.state == 1){
@@ -546,7 +541,6 @@ void VRPN_CALLBACK callback_button(void* userData, const vrpn_BUTTONCB button)
 		eventStopPull();
 	}
 }
-
 void InitTracker(OSGCSM::CAVEConfig &cfg)
 {
 	try
@@ -570,7 +564,6 @@ void InitTracker(OSGCSM::CAVEConfig &cfg)
 		return;
 	}
 }
-
 void check_tracker()
 {
 	tracker->mainloop();
@@ -592,6 +585,30 @@ void keyboard(unsigned char k, int x, int y)
 	float fac = 5.0f;
 	switch(k)
 	{
+		case 'p':
+			eventStartPull();
+		break;
+		case 'o':
+			eventStopPull();
+		break;
+		case 'u':
+			targetPos += Vec3f(0,0, -1.0f)*fac;
+		break;
+		case 'j':
+			targetPos += Vec3f(0,0, 1.0f)*fac;
+		break;
+		case 't':
+			schleuder_position += Vec3f(0,0, -1.0f)*fac;
+		break;
+		case 'g':
+			schleuder_position += Vec3f(0,0, 1.0f)*fac;
+		break;
+		case 'c':
+			hand_position += Vec3f(-1,0, 0)*fac;
+		break;
+		case 'v':			
+			hand_position += Vec3f(1,0, 0)*fac;
+		break;
 		case 'r':
 			head_orientation = Quaternion(Vec3f(0,1,0),3.141f);
 			head_position = Vec3f(0.f, 170.f, 200.f);
@@ -638,18 +655,15 @@ void keyboard(unsigned char k, int x, int y)
 
 //****** Update LOOP *******//
 void updateLoop(float dt){
-	/*
-	ComponentTransformRecPtr st = dynamic_cast<ComponentTransform*>(shotTrans->getCore());
-	st->setTranslation(schleuder_position);
-	st->setRotation(schleuder_orientation);
-
-	
-	updateSlinshot(dt);	
+	updateSlingshot(dt);	
 	updateProjectile(dt);	
-	*/
+	updateTarget();
 
 }
 
+auto t_now= std::chrono::high_resolution_clock::now();
+auto t_last = std::chrono::high_resolution_clock::now();
+int count = 0;
 void setupGLUT(int *argc, char *argv[])
 {
 	glutInit(argc, argv);
@@ -679,14 +693,21 @@ void setupGLUT(int *argc, char *argv[])
 		}
 		glutPostRedisplay();
 	});
+	
 	glutIdleFunc([]()
 	{
+
 		check_tracker();
 		const auto speed = 1.f;
 		mgr->setUserTransform(head_position, head_orientation);
 		mgr->setTranslation(mgr->getTranslation() + speed * analog_values);
-			
-		float dt = 1.0f/30.0f;
+		t_last = t_now;
+		t_now= std::chrono::high_resolution_clock::now();
+		float dt =  (float) std::chrono::duration<double>(t_now-t_last).count();
+		count++;
+		if(count % 9000 == 0){
+			std::cout<< dt<<std::endl;
+		}
 		//update
 		updateLoop(dt);
 		
