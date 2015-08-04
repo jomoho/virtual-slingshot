@@ -82,6 +82,8 @@ Vec3f slingPoints[3] = {
 	slingPos + slingAimOff + slingRightOff,
 	slingPos + slingAimOff,
 };
+Quaternion stringRot[2]= {Quaternion(), Quaternion()};
+float stringScaleY[2] = {2.0f,2.0f};
 
 int playerHit = 0, playerScore = 0;
 
@@ -137,7 +139,7 @@ NodeRecPtr makeHelper(){
 }
 
 NodeRecPtr makeString(){
-	NodeRecPtr boxChild = makeCylinder(1,1,6,true,true,true);
+	NodeRecPtr boxChild = makeCylinder(20,1,6,true,true,true);
 	SimpleMaterialRecPtr boxMat = SimpleMaterial::create();
 
 	boxMat->setDiffuse(Color3f(1,0.2f,0.1f));
@@ -148,13 +150,17 @@ NodeRecPtr makeString(){
 	boxGeo->setMaterial(boxMat);
 	
 	ComponentTransformRecPtr bt = ComponentTransform::create();
-	bt->setTranslation(Vec3f(0.f));
-	bt->setRotation(Quaternion(Vec3f(1,0,0),osgDegree2Rad(0)));
+	bt->setTranslation(Vec3f(0,10,0));
 
 	NodeRecPtr ht = Node::create();
 	ht->setCore(bt);
 	ht->addChild(boxChild);
-	return ht;
+
+	NodeRecPtr wrap = Node::create();
+	ComponentTransformRecPtr wt = ComponentTransform::create();
+	wrap->setCore(wt);
+	wrap->addChild(ht);
+	return wrap;
 }
 
 NodeRecPtr loadModel(std::string filename, 
@@ -207,6 +213,24 @@ void calcSlingPoints(){
 	slingPoints[SL_RIGHT]= slingPos + tmpRight;
 
 
+}
+void calcStringRotScale(){
+	Vec3f d0 = handPos - slingPoints[0];
+	Vec3f d1 = handPos - slingPoints[1] ;
+	
+	auto l0 = d0.length(), l1 = d1.length();
+	stringScaleY[0] = l0/20.0f;
+	stringScaleY[1] = l1/20.0f;
+
+	d0.normalize();
+	d1.normalize();
+	float ang0 =  acosf(Vec3f(0,1,0).dot(d0));
+	Vec3f ax0 = Vec3f(0,1,0).cross(d0);
+	float ang1 =  acosf(Vec3f(0,1,0).dot(d1));
+	Vec3f ax1 = Vec3f(0,1,0).cross(d1);
+
+	stringRot[0] = Quaternion(ax0, ang0);
+	stringRot[1] = Quaternion(ax1, ang1);
 }
 
 NodeTransitPtr createScenegraph() {
@@ -451,7 +475,14 @@ void updateTarget(){
 
 void updateSlingshot(float dt){
 	calcSlingPoints();
+	calcStringRotScale();
 
+	for(int i = 0; i < 2; i++){
+		ComponentTransformRecPtr strt = dynamic_cast<ComponentTransform*>(stringTrans[i]->getCore());
+		strt->setScale(Vec3f(1,stringScaleY[i], 1));
+		strt->setRotation(stringRot[i]);
+		strt->setTranslation(slingPoints[i]);		
+	}
 	for(int i = 0; i < 3; i++){
 		ComponentTransformRecPtr hlpt = dynamic_cast<ComponentTransform*>(helperTrans[i]->getCore());
 		hlpt->setTranslation(slingPoints[i]);		
