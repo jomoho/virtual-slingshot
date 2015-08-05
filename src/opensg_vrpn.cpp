@@ -37,7 +37,7 @@
 
 OSG_USING_NAMESPACE
 
-#define HELPERS_ON 0
+#define HELPERS_ON 1
 
 OSGCSM::CAVEConfig cfg;
 OSGCSM::CAVESceneManager *mgr = nullptr;
@@ -53,11 +53,13 @@ NodeRecPtr root,
 		slingTrans,
 		projectileTrans,
 		pocketTrans,
-		helpTrans, 
+		helpTrans,
+		rollTrans,
+		markerTrans,
 		ttrans;
 
 NodeRecPtr stringTrans[2],
-			helperTrans[3]; 
+			helperTrans[4]; 
 
 NodeRecPtr beachTrans;
 
@@ -96,6 +98,8 @@ Vec3f pocketPoints[2] ={stringFollow + pocketOff[0], stringFollow + pocketOff[1]
 Quaternion stringRot[2]= {Quaternion(), Quaternion()};
 
 Vec3f stringScale[2] = {Vec3f(1,2.0f,1),Vec3f(1,2.0f,1)};
+Vec3f resetButtonPos, scoreMarkerPos,scoreMarkerOff = Vec3f(101,6,-7);
+Vec3f counterPos =  Vec3f(80,0,-100);
 
 int playerHit = 0, playerScore = 0;
 
@@ -118,6 +122,8 @@ void cleanup()
 	slingTrans = NULL;
 	projectileTrans = NULL;
 	pocketTrans = NULL;
+	rollTrans = NULL;
+	markerTrans = NULL;
 	helpTrans = NULL;
 	stringTrans[0] =NULL;
 	stringTrans[1] =NULL;
@@ -126,6 +132,7 @@ void cleanup()
 	helperTrans[0] = NULL;
 	helperTrans[1] = NULL;
 	helperTrans[2] = NULL;
+	helperTrans[3] = NULL;
 
 }
 
@@ -224,6 +231,8 @@ NodeTransitPtr createScenegraph() {
 	root->addChild(helperTrans[1]);
 	helperTrans[2] = makeHelper();
 	root->addChild(helperTrans[2]);
+	helperTrans[3] = makeHelper();
+	root->addChild(helperTrans[3]);
 
 	ttrans = makeHelper();	
 	root->addChild(ttrans);
@@ -287,7 +296,7 @@ NodeTransitPtr createScenegraph() {
 	pocketTrans = loadModel("models/pocket.obj");
 	root->addChild(pocketTrans);
 
-	standTrans = loadModel("models/stand.obj", targetPos - Vec3f(0, 159,0), 100.0f);
+	standTrans = loadModel("models/stand.obj", targetPos - Vec3f(0, 159,0));
 	root->addChild(standTrans);
 
 	targetTrans = loadModel("models/target.obj", targetPos, 1.0f, Quaternion(Vec3f(1,0,0),osgDegree2Rad(0)));
@@ -296,27 +305,39 @@ NodeTransitPtr createScenegraph() {
 
 	NodeRecPtr skybox = loadModel("models/skybox.obj", Vec3f(12,0,0), 10.0f);
 	root->addChild(skybox);
+	NodeRecPtr counter = loadModel("models/counter.obj",counterPos);
+	root->addChild(counter);
+	resetButtonPos = counterPos + Vec3f(9, 120, -15);
 
+	rollTrans = loadModel("models/counter_roll.obj", counterPos + Vec3f(45,85,-40));
+	root->addChild(rollTrans);
+	
+	scoreMarkerPos = counterPos + scoreMarkerOff + Vec3f(0,playerScore*0.1,0);
+	markerTrans = loadModel("models/score_marker.obj", scoreMarkerPos);
+	root->addChild(markerTrans);
 
+	
+	#if HELPERS_ON == 1
+		ComponentTransformRecPtr ht = dynamic_cast<ComponentTransform*>(helperTrans[3]->getCore());
+		ht->setTranslation(resetButtonPos);
+	#endif
 
 	PointLightRecPtr sunLight = PointLight::create();
 	//sunLight->setAttenuation(1,0,2);
 	//color information
 	sunLight->setDiffuse(Color4f(1,1,1,1));
-	sunLight->setAmbient(Color4f(0.2f,0.2f,0.2f,1));
+	sunLight->setAmbient(Color4f(0.5f,0.5f,0.5f,1));
 	sunLight->setSpecular(Color4f(1,1,1,1));
 	sunLight->setBeacon(sunChild); //attach to the sun node use this node as position beacon
 	root->setCore(sunLight);
 
 	DirectionalLightRecPtr dirLight = DirectionalLight::create();
-	dirLight->setDirection(0,-1,0);
+	dirLight->setDirection(-1,-1,0);
 
 	//color information
 	dirLight->setDiffuse(Color4f(1,1,1,1));
 	dirLight->setAmbient(Color4f(0.2f,0.2f,0.2f,1));
 	dirLight->setSpecular(Color4f(1,1,1,1));
-
-
 
 	//wrap the root, cause only nodes below the lights will be lit
 	NodeRecPtr ueberroot = makeNodeFor(dirLight);
@@ -340,6 +361,10 @@ int pullState = PULL_LOOSE;
 int projState = PROJ_DEAD;
 
 
+void reset(){
+	playerHit = 0;
+	playerScore=0;
+}
 void startProjectile(Vec3f pos, Vec3f dir){
 	projPos = pos;
 	projSpeed = dir*20.f;
@@ -371,8 +396,17 @@ void eventStartPull(){
 		pullState = PULL_GOING;
 		projState = PROJ_PULL;
 		projOnTarget = false;
-
+		playerHit=0;
 		std::cout << "start pull" << std::endl;
+	}else{
+		
+		Vec3f d = resetButtonPos - handPos;
+		float len = d.length();
+		std::cout << "length: " << len << std::endl;
+		if(len <= 20.f){
+			std::cout << "reset score"<< std::endl;
+			reset();
+		}
 	}
 }
 
@@ -459,7 +493,24 @@ void updatePocket(){
 	pt->setRotation(rot);
 }
 
+#define MAX_SCORE 2000
 
+void updateStand(float dt){
+	
+	playerScore = std::min(playerScore, MAX_SCORE);
+	if(playerScore == MAX_SCORE){
+		playerHit = 7;
+	}
+	ComponentTransformRecPtr st = dynamic_cast<ComponentTransform*>(rollTrans->getCore());
+	st->setRotation(Quaternion(Vec3f(1,0,0), osgDegree2Rad(playerHit*45)));
+
+
+	scoreMarkerPos = counterPos + scoreMarkerOff + Vec3f(0,playerScore*0.1,0);
+	
+	ComponentTransformRecPtr mt = dynamic_cast<ComponentTransform*>(markerTrans->getCore());
+	mt->setTranslation(scoreMarkerPos);
+
+}
 void calcStringRotScale(){
 	Vec3f d0 = pocketPoints[0] - slingPoints[0];
 	Vec3f d1 = pocketPoints[1] - slingPoints[1] ;
@@ -487,6 +538,7 @@ void calcStringRotScale(){
 	stringRot[0] = Quaternion(ax0, ang0);
 	stringRot[1] = Quaternion(ax1, ang1);
 }
+
 void updateSlingshot(float dt){
 	calcSlingPoints();
 
@@ -582,6 +634,7 @@ void updateProjectile(float dt){
 			Vec3f inter = projPos + (d*t);
 			std::cout << "hit floor: "<< nPos << std::endl;
 			stopProjectile(inter);
+			playerHit = 6;
 		} else {
 			projPos = nPos;
 		}
@@ -618,6 +671,7 @@ void VRPN_CALLBACK callback_analog(void* userData, const vrpn_ANALOGCB analog)
 {
 	if (analog.num_channel >= 2){
 		analog_values = Vec3f(analog.channel[0], 0, -analog.channel[1]);
+		targetPos += Vec3f(0,0, analog_values[2]);
 		std::cout << "analog values: " << analog_values << std::endl;
 	}
 }
@@ -700,9 +754,19 @@ void keyboard(unsigned char k, int x, int y)
 		case 'v':			
 			handPos += Vec3f(1,0, 0)*fac;
 		break;
+		case 'q':
+			handPos += Vec3f(0,0,-1)*fac;
+		break;
+		case 'y':			
+			handPos += Vec3f(0,0,1)*fac;
+		break;
+		case '$':			
+			handPos += Vec3f(0,-1,0)*fac;
+		break;
 		case 'r':
 			headRot = Quaternion(Vec3f(0,1,0),3.141f);
 			headPos = Vec3f(0.f, 170.f, 200.f);
+			reset();
 		break;
 		case 'w':
 			headPos += Vec3f(0,0, -1.0f)*fac;
@@ -716,7 +780,6 @@ void keyboard(unsigned char k, int x, int y)
 		case 'd':
 			headPos += Vec3f(1.0f,0,0 )*fac;
 			break;
-		case 'q':
 		case 27: 
 			//root->clearChildren();
 			cleanup();
@@ -739,6 +802,10 @@ void keyboard(unsigned char k, int x, int y)
 		case 'i':
 			print_tracker();
 			break;
+		case 'f':
+			playerScore += 200;
+			std::cout << "score:" << playerScore<< std::endl;
+			break;
 		default:
 			std::cout << "Key '" << k << "' ignored\n";
 	}
@@ -749,6 +816,7 @@ void updateLoop(float dt){
 	updateSlingshot(dt);	
 	updateProjectile(dt);	
 	updateTarget();
+	updateStand(dt);
 
 }
 
