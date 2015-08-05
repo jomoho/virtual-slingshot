@@ -90,7 +90,7 @@ Vec3f slingPoints[4] = {
 
 Vec3f stringFollow = slingPoints[SL_LOOSE], stringFollowspeed = Vec3f(0,0,0);
 
-const Vec3f pocketOff[2] = {Vec3f(-2.5,0,-1.5), Vec3f(2.5,0,-1.5)};
+const Vec3f pocketOff[2] = {Vec3f(-2.6,0,-1.4), Vec3f(2.6,0,-1.4)};
 Vec3f pocketPoints[2] ={stringFollow + pocketOff[0], stringFollow + pocketOff[1]};
 
 Quaternion stringRot[2]= {Quaternion(), Quaternion()};
