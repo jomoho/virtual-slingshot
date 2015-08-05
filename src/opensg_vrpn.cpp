@@ -52,7 +52,9 @@ NodeRecPtr root,
 		targetTrans,
 		slingTrans,
 		projectileTrans,
-		helpTrans, ttrans;
+		pocketTrans,
+		helpTrans, 
+		ttrans;
 
 NodeRecPtr stringTrans[2],
 			helperTrans[3]; 
@@ -85,14 +87,20 @@ Vec3f slingPoints[4] = {
 	slingPos + slingAimOff,
 	slingPos + slingAimOff + slingLooseOff
 };
+
+Vec3f stringFollow = slingPoints[SL_LOOSE], stringFollowspeed = Vec3f(0,0,0);
+
+const Vec3f pocketOff[2] = {Vec3f(-2.5,0,-1.5), Vec3f(2.5,0,-1.5)};
+Vec3f pocketPoints[2] ={stringFollow + pocketOff[0], stringFollow + pocketOff[1]};
+
 Quaternion stringRot[2]= {Quaternion(), Quaternion()};
-float stringScaleY[2] = {2.0f,2.0f};
+
+Vec3f stringScale[2] = {Vec3f(1,2.0f,1),Vec3f(1,2.0f,1)};
 
 int playerHit = 0, playerScore = 0;
 
 bool projOnTarget = false;
 
-Vec3f stringFollow = slingPoints[SL_LOOSE], stringFollowspeed = Vec3f(0,0,0);
 
 void cleanup()
 {
@@ -109,6 +117,7 @@ void cleanup()
 	targetTrans = NULL;
 	slingTrans = NULL;
 	projectileTrans = NULL;
+	pocketTrans = NULL;
 	helpTrans = NULL;
 	stringTrans[0] =NULL;
 	stringTrans[1] =NULL;
@@ -147,7 +156,7 @@ NodeRecPtr makeHelper(){
 #endif
 
 NodeRecPtr makeString(SimpleTexturedMaterialRecPtr tex){
-	NodeRecPtr boxChild = makeCylinder(20,1,6,true,true,true);
+	NodeRecPtr boxChild = makeCylinder(20,0.5,6,true,true,true);
 	
 	GeometryRecPtr boxGeo = dynamic_cast<Geometry*>(boxChild->getCore());
 	boxGeo->setMaterial(tex);
@@ -200,53 +209,6 @@ NodeRecPtr loadModel(std::string filename,
 	return modelTrans;
  }
 
-void calcSlingPoints(){
-	Vec3f tmpAim = Vec3f(0,0,0);
-	slingRot.multVec(slingAimOff, tmpAim);
-	
-	Vec3f tmpLeft = Vec3f(0,0,0);
-	slingRot.multVec(slingAimOff+slingLeftOff, tmpLeft);
-	
-	Vec3f tmpRight = Vec3f(0,0,0);
-	slingRot.multVec(slingAimOff+slingRightOff, tmpRight);
-
-	Vec3f tmpLoose = Vec3f(0,0,0);
-	slingRot.multVec(slingAimOff+slingLooseOff, tmpLoose);
-
-
-	slingPoints[SL_AIM]= slingPos + tmpAim;
-	slingPoints[SL_LEFT]= slingPos + tmpLeft;
-	slingPoints[SL_RIGHT]= slingPos + tmpRight;
-	slingPoints[SL_LOOSE]= slingPos + tmpLoose;
-
-
-}
-
-void calcStringFollow(float dt){
-	Vec3f d = slingPoints[SL_LOOSE] - stringFollow;
-	stringFollow += stringFollowspeed * dt * 240.0f;
-
-	d*= 1.0;
-	stringFollowspeed =(stringFollowspeed *50.f *dt) + d*dt;
-}
-void calcStringRotScale(Vec3f pos){
-	Vec3f d0 = pos - slingPoints[0];
-	Vec3f d1 = pos - slingPoints[1] ;
-	
-	auto l0 = d0.length(), l1 = d1.length();
-	stringScaleY[0] = l0/20.0f;
-	stringScaleY[1] = l1/20.0f;
-
-	d0.normalize();
-	d1.normalize();
-	float ang0 =  acosf(Vec3f(0,1,0).dot(d0));
-	Vec3f ax0 = Vec3f(0,1,0).cross(d0);
-	float ang1 =  acosf(Vec3f(0,1,0).dot(d1));
-	Vec3f ax1 = Vec3f(0,1,0).cross(d1);
-
-	stringRot[0] = Quaternion(ax0, ang0);
-	stringRot[1] = Quaternion(ax1, ang1);
-}
 
 NodeTransitPtr createScenegraph() {
 	NodeRecPtr root = Node::create();
@@ -321,6 +283,9 @@ NodeTransitPtr createScenegraph() {
 	
 	projectileTrans = loadModel("models/projectile.obj");
 	root->addChild(projectileTrans);
+	
+	pocketTrans = loadModel("models/pocket.obj");
+	root->addChild(pocketTrans);
 
 	standTrans = loadModel("models/stand.obj", targetPos - Vec3f(0, 159,0), 100.0f);
 	root->addChild(standTrans);
@@ -443,6 +408,85 @@ void updateTarget(){
 #endif
 }
 
+void calcSlingPoints(){
+	Vec3f tmpAim = Vec3f(0,0,0);
+	slingRot.multVec(slingAimOff, tmpAim);
+	
+	Vec3f tmpLeft = Vec3f(0,0,0);
+	slingRot.multVec(slingAimOff+slingLeftOff, tmpLeft);
+	
+	Vec3f tmpRight = Vec3f(0,0,0);
+	slingRot.multVec(slingAimOff+slingRightOff, tmpRight);
+
+	Vec3f tmpLoose = Vec3f(0,0,0);
+	slingRot.multVec(slingAimOff+slingLooseOff, tmpLoose);
+
+
+	slingPoints[SL_AIM]= slingPos + tmpAim;
+	slingPoints[SL_LEFT]= slingPos + tmpLeft;
+	slingPoints[SL_RIGHT]= slingPos + tmpRight;
+	slingPoints[SL_LOOSE]= slingPos + tmpLoose;
+
+
+}
+
+void calcStringFollow(float dt){
+	Vec3f d = slingPoints[SL_LOOSE] - stringFollow;
+	stringFollow += stringFollowspeed * dt * 240.0f;
+
+	d*= 1.0;
+	stringFollowspeed =(stringFollowspeed *50.f *dt) + d*dt;
+}
+
+void updatePocket(){
+	auto d = slingPoints[SL_AIM] - stringFollow ;
+	d.normalize();
+	float angleX = d.dot(Vec3f(1,0,0));
+	auto axisX = d.cross(Vec3f(1,0,0));
+	auto rotX = Quaternion(axisX, angleX);
+
+	float angleY = d.dot(Vec3f(0,1,0));
+	auto axisY = d.cross(Vec3f(0,1,0));
+	auto rot = rotX * Quaternion(axisY, angleY);
+
+	rot.multVec(pocketOff[0], pocketPoints[0]);
+	rot.multVec(pocketOff[1], pocketPoints[1]);
+	pocketPoints[0] += stringFollow;
+	pocketPoints[1] += stringFollow;
+
+	ComponentTransformRecPtr pt = dynamic_cast<ComponentTransform*>(pocketTrans->getCore());
+	pt->setTranslation(stringFollow);
+	pt->setRotation(rot);
+}
+
+
+void calcStringRotScale(){
+	Vec3f d0 = pocketPoints[0] - slingPoints[0];
+	Vec3f d1 = pocketPoints[1] - slingPoints[1] ;
+	
+	auto l0 = d0.length(), 
+		l1 = d1.length();
+
+	stringScale[0][1] = l0/20.0f;
+	stringScale[1][1] = l1/20.0f;
+	
+	float thick0 = 0.5 + 5* 1/l0;
+	stringScale[0] =Vec3f(thick0, l0/20.0f, thick0);
+	float thick1 = 0.5 + 5* 1/l1;
+	stringScale[1] =Vec3f(thick1, l1/20.0f, thick1);
+
+	d0.normalize();
+	d1.normalize();
+
+	float ang0 =  acosf(Vec3f(0,1,0).dot(d0));
+	Vec3f ax0 = Vec3f(0,1,0).cross(d0);
+
+	float ang1 =  acosf(Vec3f(0,1,0).dot(d1));
+	Vec3f ax1 = Vec3f(0,1,0).cross(d1);
+
+	stringRot[0] = Quaternion(ax0, ang0);
+	stringRot[1] = Quaternion(ax1, ang1);
+}
 void updateSlingshot(float dt){
 	calcSlingPoints();
 
@@ -463,21 +507,21 @@ void updateSlingshot(float dt){
 	st->setRotation(slingRot);
 
 	if(pullState == PULL_GOING){
-		calcStringRotScale(handPos);
 		stringFollow = handPos;
-		stringFollowspeed = Vec3f(0,0,0);
-		
+		stringFollowspeed = Vec3f(0,0,0);	
 	}else if(pullState == PULL_LOOSE){
 		calcStringFollow(dt);
-		calcStringRotScale(stringFollow);
 	}
+	updatePocket();
+	calcStringRotScale();
 
 	for(int i = 0; i < 2; i++){
 		ComponentTransformRecPtr strt = dynamic_cast<ComponentTransform*>(stringTrans[i]->getCore());
-		strt->setScale(Vec3f(1,stringScaleY[i], 1));
+		strt->setScale(stringScale[i]);
 		strt->setRotation(stringRot[i]);
 		strt->setTranslation(slingPoints[i]);		
 	}
+
 }
 
 #define VX 0
