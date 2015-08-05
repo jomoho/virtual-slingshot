@@ -78,8 +78,8 @@ Vec3f projSpeed, projPos, targetPos = Vec3f(0, 160, -200);
 #define SL_RIGHT 1
 
 const Vec3f slingAimOff = Vec3f(0, 10, 0);
-const Vec3f slingLeftOff = Vec3f(-6.5f,0,0);
-const Vec3f slingRightOff = Vec3f(6.5f,0,0);
+const Vec3f slingLeftOff = Vec3f(-6.7f,0,0.5);
+const Vec3f slingRightOff = Vec3f(6.7f,0,0.5);
 const Vec3f slingLooseOff = Vec3f(0,0,6);
 Vec3f slingPoints[4] = {
 	slingPos + slingAimOff + slingLeftOff,
