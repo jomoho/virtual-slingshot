@@ -37,7 +37,7 @@
 
 OSG_USING_NAMESPACE
 
-#define HELPERS_ON 1
+#define HELPERS_ON 0
 
 OSGCSM::CAVEConfig cfg;
 OSGCSM::CAVESceneManager *mgr = nullptr;
@@ -601,15 +601,17 @@ void updateProjectile(float dt){
 		//check if target is hit:
 		//the flight direction	
 	
-		if (targetPos[VZ] < projPos[VZ] && targetPos[VZ] > nPos[VZ]){
+		if (targetPos[2] < projPos[2] && targetPos[VZ] > nPos[2]){
 			Vec3f d = nPos - projPos;
-			float t = (targetPos[VZ] - projPos[VZ]) / d[3];		
+			float t = (float)((float)targetPos[2] - (float)projPos[2]) / (float)d[2];		
 			//calc the intersection point:
 			Vec3f inter = projPos + (d*t);
-		
+			std::cout << "d: " << d	<< " t: " << t <<std::endl;
 			Vec3f d2	= targetPos - inter;
 			float targetSize = 50.0f;
 			float dist = d2.length();
+			std::cout <<"targetPos: "<< targetPos << " projPos: "<< projPos << " d2:" << d2 << std::endl;
+			std::cout << "targetSize:" << targetSize << " dist: "<< dist << " hit: "<< (dist <= targetSize) << std::endl;
 			if(dist <= targetSize){
 				int scores[] = {100,75,50,20,10};
 				std::string colors[] = {"yellow", "red", "blue", "black", "white"};
@@ -621,7 +623,7 @@ void updateProjectile(float dt){
 				projOnTarget = true;
 			}else{				
 				playerHit = 6;
-				std::cout << "missed target at: " << projPos << " || "<< nPos << std::endl;
+				std::cout << "missed target at: " << projPos << " || "<< nPos << " inters:" << inter << std::endl;
 			}
 		} else {
 			projPos = nPos;
@@ -671,7 +673,7 @@ void VRPN_CALLBACK callback_analog(void* userData, const vrpn_ANALOGCB analog)
 {
 	if (analog.num_channel >= 2){
 		analog_values = Vec3f(analog.channel[0], 0, -analog.channel[1]);
-		targetPos += Vec3f(0,0, analog_values[2]);
+		targetPos += Vec3f(0,0, analog_values[2]*100);
 		std::cout << "analog values: " << analog_values << std::endl;
 	}
 }
@@ -862,7 +864,8 @@ void setupGLUT(int *argc, char *argv[])
 		check_tracker();
 		const auto speed = 1.f;
 		mgr->setUserTransform(headPos, headRot);
-		mgr->setTranslation(mgr->getTranslation() + speed * analog_values);
+		mgr->setTranslation(mgr->getTranslation());
+		//mgr->setTranslation(mgr->getTranslation() + speed * analog_values);
 		t_last = t_now;
 		t_now= std::chrono::high_resolution_clock::now();
 		float dt =  (float) std::chrono::duration<double>(t_now-t_last).count();
