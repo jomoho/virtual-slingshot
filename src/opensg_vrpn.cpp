@@ -90,7 +90,7 @@ Vec3f slingPoints[4] = {
 	slingPos + slingAimOff + slingLooseOff
 };
 
-Vec3f stringFollow = slingPoints[SL_LOOSE], stringFollowspeed = Vec3f(0,0,0);
+Vec3f stringFollow = slingPoints[SL_LOOSE], stringFollowSpeed = Vec3f(0,0,0);
 
 const Vec3f pocketOff[2] = {Vec3f(-2.6,0,-1.4), Vec3f(2.6,0,-1.4)};
 Vec3f pocketPoints[2] ={stringFollow + pocketOff[0], stringFollow + pocketOff[1]};
@@ -396,6 +396,7 @@ void eventStartPull(){
 		pullState = PULL_GOING;
 		projState = PROJ_PULL;
 		projOnTarget = false;
+		stringFollowSpeed = Vec3f(0,0,0);
 		playerHit=0;
 		std::cout << "start pull" << std::endl;
 	}else{
@@ -460,19 +461,17 @@ void calcSlingPoints(){
 	slingPoints[SL_LEFT]= slingPos + tmpLeft;
 	slingPoints[SL_RIGHT]= slingPos + tmpRight;
 	slingPoints[SL_LOOSE]= slingPos + tmpLoose;
-
-
 }
 
 void calcStringFollow(float dt){
 	Vec3f d = slingPoints[SL_LOOSE] - stringFollow;
-	stringFollow += stringFollowspeed * dt * 240.0f;
+	stringFollow += stringFollowSpeed * dt * 240.0f;
 
-	d*= 1.0;
-	stringFollowspeed =(stringFollowspeed *50.f *dt) + d*dt;
+	d*= 0.8;
+	stringFollowSpeed =(stringFollowSpeed *43.f *dt) + d*dt;
 }
-
-void updatePocket(){
+/*
+void updatePocket_old(){
 	auto d = slingPoints[SL_AIM] - stringFollow ;
 	d.normalize();
 	float angleX = d.dot(Vec3f(1,0,0));
@@ -482,6 +481,28 @@ void updatePocket(){
 	float angleY = d.dot(Vec3f(0,1,0));
 	auto axisY = d.cross(Vec3f(0,1,0));
 	auto rot = rotX * Quaternion(axisY, angleY);
+
+	rot.multVec(pocketOff[0], pocketPoints[0]);
+	rot.multVec(pocketOff[1], pocketPoints[1]);
+	pocketPoints[0] += stringFollow;
+	pocketPoints[1] += stringFollow;
+
+	ComponentTransformRecPtr pt = dynamic_cast<ComponentTransform*>(pocketTrans->getCore());
+	pt->setTranslation(stringFollow);
+	pt->setRotation(rot);
+}
+*/
+void updatePocket(){
+	auto d = slingPoints[SL_AIM] - stringFollow ;
+	d.normalize();
+
+	Vec3f up;
+	slingRot.multVec(Vec3f(0,1,0), up);
+
+	float angle = d.dot(up);
+	auto axis = d.cross(up);
+
+	auto rot = Quaternion(axis, angle) * slingRot;
 
 	rot.multVec(pocketOff[0], pocketPoints[0]);
 	rot.multVec(pocketOff[1], pocketPoints[1]);
@@ -560,7 +581,7 @@ void updateSlingshot(float dt){
 
 	if(pullState == PULL_GOING){
 		stringFollow = handPos;
-		stringFollowspeed = Vec3f(0,0,0);	
+		stringFollowSpeed = Vec3f(0,0,0);	
 	}else if(pullState == PULL_LOOSE){
 		calcStringFollow(dt);
 	}
@@ -590,7 +611,7 @@ void updateProjectile(float dt){
 	}
 	
 	if(projState == PROJ_FLY){	
-		float fact = 0.2f;
+		float fact = 0.4f;
 		Vec3f gravity = Vec3f(0.0f, -981.f, 0.0f);
 		projSpeed += gravity * dt * fact;
 		//new position
